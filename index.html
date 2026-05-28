@@ -27,7 +27,7 @@
         .tab-content.active { display: block; }
 
         .tasa-box { background: #fff; padding: 5px 15px; border-radius: 20px; display: flex; align-items: center; gap: 8px; font-weight: bold; color: #333; }
-        .tasa-box input { width: 70px; padding: 3px; text-align: center; font-weight: bold; }
+        .tasa-box input { width: 70px; padding: 3px; text-align: center; font-weight: bold; transition: 0.2s; }
 
         /* Componentes */
         .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
@@ -107,6 +107,13 @@
         <div class="grid-2">
             <div class="card">
                 <h3>Catálogo de Ventas</h3>
+                
+                <div id="barcode-scanner-horizontal" style="display: flex; gap: 10px; align-items: center; background: #eef2f5; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
+                    <span style="font-weight: bold; font-size: 14px; white-space: nowrap;">📋 Lector Barras:</span>
+                    <input type="text" id="caja-barcode-input" class="input-field" placeholder="Escanee o ingrese código de barras..." style="margin: 0; flex-grow: 1;" onkeydown="if(event.key === 'Enter') procesarEscaneoBarcode()">
+                    <button class="btn btn-primary" onclick="procesarEscaneoBarcode()" style="white-space: nowrap;">Buscar/Añadir</button>
+                </div>
+
                 <input type="text" id="caja-buscar-prod" class="search-bar" placeholder="🔍 Buscar producto en inventario rápido..." oninput="filtrarProductosCaja()">
                 <div class="prod-grid" id="caja-productos-container"></div>
             </div>
@@ -127,8 +134,8 @@
                 </select>
                 
                 <div id="wrapper-valores-contado">
-                    <label>Número de Referencia de Pago:</label>
-                    <input type="text" id="caja-referencia" class="input-field" placeholder="Número de transacción bancaria">
+                    <label>Número de Referencia de Pago (5 dígitos):</label>
+                    <input type="text" id="caja-referencia" class="input-field" placeholder="Ej: 12345" maxlength="5" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
                     
                     <label>Monto del Abono Inicial (Bs):</label>
                     <input type="number" id="caja-monto-abono-bs" step="0.01" class="input-field" placeholder="Monto total liquidado en bolívares">
@@ -140,9 +147,22 @@
                 <h4>Productos Seleccionados:</h4>
                 <div id="caja-items-seleccionados" style="max-height: 180px; overflow-y: auto; margin-bottom: 15px; border-bottom: 1px solid #ddd;"></div>
                 
-                <div style="font-size: 18px; font-weight: bold; background: #eef2f5; padding: 10px; border-radius: 4px;">
-                    <div>Total USD: $<span id="total-usd">0.00</span></div>
-                    <div style="color: #555; font-size: 15px; margin-top:5px;">Total BS: <span id="total-bs">0.00</span> Bs</div>
+                <div id="totals-breakdown-box" style="background: #eef2f5; padding: 12px; border-radius: 4px; line-height: 1.6;">
+                    <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; color: #333;">
+                        <span>Monto Total Bruto (Sin Descuento):</span>
+                        <span id="bruto-dinamico-txt">$0.00 | 0.00 Bs</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--danger); margin-bottom: 4px;">
+                        <span>Descuentos Deducidos:</span>
+                        <span id="descuento-dinamico-txt">-$0.00 | -0.00 Bs</span>
+                    </div>
+                    <div style="font-size: 18px; font-weight: bold; border-top: 1px dashed #bbb; padding-top: 6px; display: flex; justify-content: space-between; align-items: center;">
+                        <span>TOTAL NETO (Con Descuento):</span>
+                        <div style="text-align: right;">
+                            <span style="color: var(--success);">$<span id="total-usd">0.00</span></span><br>
+                            <span style="color: #333; font-size: 14px;"><span id="total-bs">0.00</span> Bs</span>
+                        </div>
+                    </div>
                 </div>
                 <button class="btn btn-success btn-block" style="margin-top:15px;" onclick="procesarFacturacion()">FACTURAR & IMPRIMIR</button>
             </div>
@@ -197,8 +217,8 @@
                         <input type="text" id="abono-monto-usd" class="input-field" readonly style="background:#eee;">
                     </div>
                 </div>
-                <label>Número de Referencia del Abono:</label>
-                <input type="text" id="abono-ref-num" class="input-field" placeholder="N° de operación bancaria">
+                <label>Número de Referencia del Abono (5 dígitos):</label>
+                <input type="text" id="abono-ref-num" class="input-field" placeholder="Ej: 54321" maxlength="5" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
                 <label>Adjuntar Comprobante Digital (Imagen):</label>
                 <input type="file" id="abono-file" class="input-field" accept="image/*">
                 
@@ -247,6 +267,10 @@
                     <input type="hidden" id="alm-id-edicion">
                     <label>Nombre del Producto:</label>
                     <input type="text" id="alm-nombre" class="input-field">
+                    
+                    <label>Código de Barras:</label>
+                    <input type="text" id="alm-barcode" class="input-field" placeholder="Escanee o asigne código de barras">
+                    
                     <div class="grid-equal">
                         <div>
                             <label>Precio USD ($):</label>
@@ -262,9 +286,10 @@
                 </div>
 
                 <input type="text" id="almacen-buscar" class="search-bar" placeholder="🔍 Buscador rápido en almacén..." oninput="filtrarAlmacenTabla()">
+                <p style="font-size: 11px; color: #666; margin: 2px 0 8px 0;">💡 <i>Nota: Presione <b>doble clic</b> sobre la fila de cualquier producto para editarlo.</i></p>
                 <table style="font-size: 13px;">
                     <thead>
-                        <tr><th>Producto</th><th>Precio $</th><th>Stock</th><th>Acciones</th></tr>
+                        <tr><th>Producto / Código</th><th>Precio $</th><th>Stock</th><th>Acciones</th></tr>
                     </thead>
                     <tbody id="almacen-tabla-cuerpo"></tbody>
                 </table>
@@ -292,7 +317,7 @@
                 <p style="margin:3px 0;">Vendedor: <span id="tk-vend"></span></p>
                 <p style="margin:3px 0;">Cliente: <span id="tk-cliente-name"></span></p>
                 <p style="margin:3px 0;">Condición: <span id="tk-condicion"></span></p>
-                <p style="margin:3px 0;">Ref: <span id="tk-ref"></span></p>
+                <p style="margin:3px 0;">Ref Base: <span id="tk-ref"></span></p>
             </div>
         </div>
 
@@ -310,9 +335,14 @@
         </table>
 
         <div class="factura-totales-box">
-            <div style="width: 340px; font-size: 15px; text-align: right; line-height: 1.8;">
+            <div style="width: 480px; font-size: 14px; text-align: right; line-height: 1.8;">
                 <div>Total Productos Facturados: <span id="tk-total-cantidades" style="font-weight:bold;">0</span></div>
-                <div id="tk-linea-descuento" style="font-weight: bold; color: var(--danger);"></div>
+                
+                <div id="tk-desglose-completo" style="margin-top: 5px; border-top: 1px dotted #888; padding-top: 5px; color:#444;">
+                    <div style="font-weight: bold;">Monto Total Bruto (Sin Descuento): <span id="tk-bruto-calc"></span></div>
+                    <div style="color: var(--danger);">Descuentos Deducidos: <span id="tk-desc-calc"></span></div>
+                </div>
+
                 <div style="font-size: 18px; font-weight: bold; border-top: 1px solid #000; margin-top: 5px; padding-top: 5px;">
                     TOTAL NETO: $<span id="tk-total-usd"></span>
                 </div>
@@ -377,6 +407,7 @@
         document.getElementById('global-tasa').addEventListener('input', (e) => {
             tasaBcv = parseFloat(e.target.value) || 0;
             actualizarTotalesCaja();
+            renderizarFacturasHistorico();
             if(idFacturaSeleccionada) verDetalleFactura(idFacturaSeleccionada);
         });
 
@@ -385,7 +416,7 @@
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
-            if(event) event.target.classList.add('active');
+            if(window.event && window.event.target) window.event.target.classList.add('active');
         };
 
         // --- ESCUCHAS FIREBASE REALTIME ---
@@ -402,7 +433,6 @@
                     const u = personalCache[key];
                     selectLogin.innerHTML += `<option value="${key}">${u.nombre} (${u.rol.toUpperCase()})</option>`;
                     
-                    // Mostrar contraseñas enmascaradas o simples para administradores en la tabla
                     tablaPersonal.innerHTML += `
                         <tr>
                             <td>${u.nombre}</td>
@@ -457,12 +487,25 @@
                 document.getElementById('login-pass').value = '';
                 document.getElementById('display-user-nav').innerText = `👤 ${usuarioActivo} [${rolActivo.toUpperCase()}]`;
 
-                // Aplicar Restricciones de Navegación por Membresía
+                // REGLA INTEGRADA DE ACCESO: SOLO ADMINISTRADORES PUEDEN CAMBIAR LA TASA
+                const inputTasaElement = document.getElementById('global-tasa');
+                if(rolActivo === 'administrador') {
+                    inputTasaElement.disabled = false;
+                    inputTasaElement.style.backgroundColor = "#ffffff";
+                    inputTasaElement.style.cursor = "text";
+                } else {
+                    inputTasaElement.disabled = true;
+                    inputTasaElement.style.backgroundColor = "#e9ecef";
+                    inputTasaElement.style.cursor = "not-allowed";
+                }
+
                 if(rolActivo === 'vendedor') {
                     document.getElementById('nav-config').style.display = 'none';
+                    document.getElementById('nav-facturas').style.display = 'block';
                     document.getElementById('nav-personal').style.display = 'none';
                 } else {
                     document.getElementById('nav-config').style.display = 'block';
+                    document.getElementById('nav-facturas').style.display = 'block';
                     document.getElementById('nav-personal').style.display = 'block';
                 }
 
@@ -512,20 +555,21 @@
             }
         };
 
-        // --- MODULO ALMACÉN (EDICIÓN, BUSCADOR Y ELIMINACIÓN) ---
+        // --- MODULO ALMACÉN (EDICIÓN EXCLUSIVA DOBLE CLIC Y ELIMINACIÓN) ---
         function renderizarAlmacenMantenimiento() {
             const tbody = document.getElementById('almacen-tabla-cuerpo');
             tbody.innerHTML = '';
             for(let key in productosCache) {
                 const p = productosCache[key];
+                const barcodeDisplay = p.codigoBarras ? `<br><small style="color:#666;">Code: ${p.codigoBarras}</small>` : '';
+                
                 tbody.innerHTML += `
-                    <tr class="row-almacen-item" data-name="${p.nombre.toLowerCase()}">
-                        <td>${p.nombre}</td>
+                    <tr class="row-almacen-item" data-name="${p.nombre.toLowerCase()}" ondblclick="cargarProductoParaEditar('${key}')" title="Doble clic para editar este producto" style="cursor: pointer;">
+                        <td><b>${p.nombre}</b>${barcodeDisplay}</td>
                         <td>$${p.precio.toFixed(2)}</td>
                         <td>${p.stock}</td>
                         <td>
-                            <button class="btn btn-primary" style="padding:4px 8px; font-size:12px;" onclick="cargarProductoParaEditar('${key}')">Editar</button>
-                            <button class="btn btn-danger" style="padding:4px 8px; font-size:12px;" onclick="eliminarProductoAlmacen('${key}')">Borrar</button>
+                            <button class="btn btn-danger" style="padding:4px 8px; font-size:12px;" onclick="event.stopPropagation(); eliminarProductoAlmacen('${key}')">Borrar</button>
                         </td>
                     </tr>
                 `;
@@ -542,12 +586,13 @@
         window.guardarProductoAlmacen = function() {
             const id = document.getElementById('alm-id-edicion').value;
             const nombre = document.getElementById('alm-nombre').value.trim();
+            const codigoBarras = document.getElementById('alm-barcode').value.trim() || "";
             const precio = parseFloat(document.getElementById('alm-precio').value);
             const stock = parseInt(document.getElementById('alm-stock').value);
 
             if(!nombre || isNaN(precio) || isNaN(stock)) return alert("Complete los datos del producto.");
 
-            const prodData = { nombre, precio, stock };
+            const prodData = { nombre, codigoBarras, precio, stock };
             if(id) {
                 set(ref(db, `almacen/${id}`), prodData).then(() => cancelarEdicionAlmacen());
             } else {
@@ -560,6 +605,7 @@
             const p = productosCache[key];
             document.getElementById('alm-id-edicion').value = key;
             document.getElementById('alm-nombre').value = p.nombre;
+            document.getElementById('alm-barcode').value = p.codigoBarras || '';
             document.getElementById('alm-precio').value = p.precio;
             document.getElementById('alm-stock').value = p.stock;
             document.getElementById('btn-guardar-almacen').innerText = "Actualizar Cambios";
@@ -569,6 +615,7 @@
         window.cancelarEdicionAlmacen = function() {
             document.getElementById('alm-id-edicion').value = '';
             document.getElementById('alm-nombre').value = '';
+            document.getElementById('alm-barcode').value = '';
             document.getElementById('alm-precio').value = '';
             document.getElementById('alm-stock').value = '';
             document.getElementById('btn-guardar-almacen').innerText = "Guardar Producto";
@@ -581,15 +628,16 @@
             }
         };
 
-        // --- MODULO CAJA (CAMPO EDITABLE DE UNIDADES Y BUSCADOR) ---
+        // --- MODULO CAJA & ESCANEO INTEGRADO ---
         function renderizarCatalogoCaja() {
             const container = document.getElementById('caja-productos-container');
             container.innerHTML = '';
             for(let key in productosCache) {
                 const p = productosCache[key];
+                const textBarcode = p.codigoBarras ? `<br><small style="color:#888;">${p.codigoBarras}</small>` : '';
                 container.innerHTML += `
                     <div class="prod-item caja-item-card" data-name="${p.nombre.toLowerCase()}" onclick="agregarAlCarritoConMultiplicador('${key}', this)">
-                        <strong>${p.nombre}</strong><br>
+                        <strong>${p.nombre}</strong>${textBarcode}<br>
                         <span style="color:var(--success); font-weight:bold;">$${p.precio.toFixed(2)}</span><br>
                         <small>Stock: ${p.stock}</small><br>
                         <input type="number" class="input-field qty-input-box" value="1" min="1" onclick="event.stopPropagation()" style="width:75px; text-align:center; padding:3px; margin-top:5px; display:inline-block;">
@@ -597,6 +645,70 @@
                 `;
             }
         }
+
+        window.procesarEscaneoBarcode = function() {
+            const barcodeInput = document.getElementById('caja-barcode-input');
+            const code = barcodeInput.value.trim();
+            if(!code) return;
+
+            let encontradoKey = null;
+            for(let key in productosCache) {
+                if(productosCache[key].codigoBarras && productosCache[key].codigoBarras.trim() === code) {
+                    encontradoKey = key;
+                    break;
+                }
+            }
+
+            if(encontradoKey) {
+                const prod = productosCache[encontradoKey];
+                if(prod.stock <= 0) {
+                    alert("Producto agotado en el almacén.");
+                    barcodeInput.value = '';
+                    barcodeInput.focus();
+                    return;
+                }
+                const existente = carrito.find(item => item.id === encontradoKey);
+                if(existente) {
+                    if((existente.cantidad + 1) > prod.stock) {
+                        alert("La cantidad seleccionada excede las existencias del inventario.");
+                        barcodeInput.value = '';
+                        barcodeInput.focus();
+                        return;
+                    }
+                    existente.cantidad += 1;
+                } else {
+                    carrito.push({ id: encontradoKey, nombre: prod.nombre, precio: prod.precio, cantidad: 1 });
+                }
+                actualizarTotalesCaja();
+                barcodeInput.value = '';
+                barcodeInput.focus();
+            } else {
+                // Fallback consulta a API pública externa si no existe localmente
+                fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if(data.status === 1 && data.product) {
+                            const nombreProd = data.product.product_name || `Producto Importado (${code})`;
+                            if(confirm(`Encontrado en API pública: "${nombreProd}". ¿Desea indexarlo en almacén con precio inicial de $1.00 USD?`)) {
+                                const prodProvisional = { nombre: nombreProd, codigoBarras: code, precio: 1.00, stock: 10 };
+                                push(ref(db, 'almacen'), prodProvisional).then(() => {
+                                    barcodeInput.value = '';
+                                    barcodeInput.focus();
+                                });
+                            }
+                        } else {
+                            alert(`El código "${code}" no está registrado en el inventario local ni en bases globales.`);
+                            barcodeInput.value = '';
+                            barcodeInput.focus();
+                        }
+                    })
+                    .catch(() => {
+                        alert(`Código "${code}" no localizado. Verifique o regístrelo en el módulo de Almacén.`);
+                        barcodeInput.value = '';
+                        barcodeInput.focus();
+                    });
+            }
+        };
 
         window.filtrarProductosCaja = function() {
             const val = document.getElementById('caja-buscar-prod').value.toLowerCase();
@@ -627,40 +739,51 @@
                 carrito.push({ id: key, nombre: prod.nombre, precio: prod.precio, cantidad: cantidadALlevar });
             }
             
-            qtyInput.value = 1; // Reset local input
+            qtyInput.value = 1; 
             actualizarTotalesCaja();
         };
 
+        // --- RECALCULO DE MONEDA ANCLADO EN DÓLAR ---
         function actualizarTotalesCaja() {
             const container = document.getElementById('caja-items-seleccionados');
             container.innerHTML = '';
-            let subtotal = 0;
+            let subtotalBrutoUsd = 0;
 
             carrito.forEach(item => {
-                subtotal += (item.precio * item.cantidad);
+                let subtotalItemUsd = item.precio * item.cantidad;
+                let subtotalItemBs = subtotalItemUsd * tasaBcv;
+                subtotalBrutoUsd += subtotalItemUsd;
+                
                 container.innerHTML += `
                     <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:5px;">
                         <span>${item.cantidad}x ${item.nombre}</span>
-                        <span>$${(item.precio * item.cantidad).toFixed(2)}</span>
+                        <span>$${subtotalItemUsd.toFixed(2)} (${subtotalItemBs.toFixed(2)} Bs)</span>
                     </div>
                 `;
             });
 
-            let descuento = 0;
-            if(subtotal > 2000) {
-                descuento = 0.08;
+            let descuentoPorc = 0;
+            if(subtotalBrutoUsd > 2000) {
+                descuentoPorc = 0.08;
             } else {
                 const cond = document.getElementById('caja-condicion-pago').value;
-                if(cond === 'contado') descuento = 0.07;
-                else if(cond === '15dias') descuento = 0.05;
-                else if(cond === '30dias') descuento = 0.03;
+                if(cond === 'contado') descuentoPorc = 0.07;
+                else if(cond === '15dias') descuentoPorc = 0.05;
+                else if(cond === '30dias') descuentoPorc = 0.03;
             }
 
-            const totalUsd = subtotal - (subtotal * descuento);
-            const totalBs = totalUsd * tasaBcv;
+            let totalDescuentoUsd = subtotalBrutoUsd * descuentoPorc;
+            let totalNetoUsd = subtotalBrutoUsd - totalDescuentoUsd;
 
-            document.getElementById('total-usd').innerText = totalUsd.toFixed(2) + (descuento > 0 ? ` (-${descuento*100}%)` : '');
-            document.getElementById('total-bs').innerText = totalBs.toFixed(2);
+            let subtotalBrutoBs = subtotalBrutoUsd * tasaBcv;
+            let totalDescuentoBs = totalDescuentoUsd * tasaBcv;
+            let totalNetoBs = totalNetoUsd * tasaBcv;
+
+            // Inyección en pantalla del desglose detallado
+            document.getElementById('bruto-dinamico-txt').innerText = `$${subtotalBrutoUsd.toFixed(2)} | ${subtotalBrutoBs.toFixed(2)} Bs`;
+            document.getElementById('descuento-dinamico-txt').innerText = `-$${totalDescuentoUsd.toFixed(2)} | -${totalDescuentoBs.toFixed(2)} Bs (-${descuentoPorc*100}%)`;
+            document.getElementById('total-usd').innerText = totalNetoUsd.toFixed(2);
+            document.getElementById('total-bs').innerText = totalNetoBs.toFixed(2);
         }
 
         window.limpiarCaja = function() {
@@ -669,40 +792,33 @@
             document.getElementById('caja-referencia').value = '';
             document.getElementById('caja-monto-abono-bs').value = '';
             document.getElementById('caja-comprobante-file').value = '';
+            document.getElementById('caja-barcode-input').value = '';
             actualizarTotalesCaja();
         };
 
-        // --- VALIDACIÓN ESTRICTA DE REFERENCIAS (GLOBAL Y ÚLTIMOS 5 DÍGITOS) ---
+        // --- VALIDACIÓN DE REFERENCIAS GENERAL ---
         function esReferenciaInvalidaODuplicada(nuevaRef) {
             if(!nuevaRef || nuevaRef === "Ninguna") return false;
             const refLimpia = nuevaRef.trim().toLowerCase();
-            if(refLimpia.length < 5) return false;
             
-            const ultimos5Nuevos = refLimpia.slice(-5);
-
             for(let key in facturasCache) {
                 const f = facturasCache[key];
                 
-                // Evaluar referencia raíz de factura
                 if(f.referencia && f.referencia !== "Ninguna") {
-                    const refRaiz = f.referencia.trim().toLowerCase();
-                    if(refRaiz === refLimpia || refRaiz.slice(-5) === ultimos5Nuevos) return true;
+                    const refsFragmentos = f.referencia.trim().toLowerCase().split(" - ");
+                    if(refsFragmentos.includes(refLimpia)) return true;
                 }
                 
-                // Evaluar todas las referencias en el nodo interno de abonos acumulados
                 if(f.abonos) {
                     for(let a of f.abonos) {
-                        if(a.referencia) {
-                            const refAbono = a.referencia.trim().toLowerCase();
-                            if(refAbono === refLimpia || refAbono.slice(-5) === ultimos5Nuevos) return true;
-                        }
+                        if(a.referencia && a.referencia.trim().toLowerCase() === refLimpia) return true;
                     }
                 }
             }
             return false;
         }
 
-        // --- PROCESO DE FACTURACIÓN CON AMORTIZACIÓN AUTOMÁTICA ---
+        // --- PROCESO DE FACTURACIÓN ---
         window.procesarFacturacion = function() {
             if(carrito.length === 0) return alert("La caja está vacía.");
             const cliente = document.getElementById('caja-cliente').value.trim() || "Consumidor Final";
@@ -712,30 +828,29 @@
             let abonoInicialBs = 0;
             let fileInput = document.getElementById('caja-comprobante-file');
 
-            let subtotal = carrito.reduce((acc, i) => acc + (i.precio * i.cantidad), 0);
-            let descPorc = subtotal > 2000 ? 0.08 : (condicion === 'contado' ? 0.07 : (condicion === '15dias' ? 0.05 : 0.03));
-            let totalUsd = subtotal - (subtotal * descPorc);
-            let totalBs = totalUsd * tasaBcv;
+            let subtotalBrutoUsd = carrito.reduce((acc, i) => acc + (i.precio * i.cantidad), 0);
+            let descPorc = subtotalBrutoUsd > 2000 ? 0.08 : (condicion === 'contado' ? 0.07 : (condicion === '15dias' ? 0.05 : 0.03));
+            let totalDescuentoUsd = subtotalBrutoUsd * descPorc;
+            let totalNetoUsd = subtotalBrutoUsd - totalDescuentoUsd;
+            let totalNetoBs = totalNetoUsd * tasaBcv;
             let totalCantidades = carrito.reduce((acc, i) => acc + i.cantidad, 0);
 
-            // Validación Forzada para la Condición de Pago: Contado
             if(condicion === 'contado') {
                 referencia = document.getElementById('caja-referencia').value.trim();
                 abonoInicialBs = parseFloat(document.getElementById('caja-monto-abono-bs').value) || 0;
 
                 if(!referencia) return alert("Falta el número de referencia para procesar la venta de contado.");
+                if(referencia.length !== 5) return alert("La referencia debe tener exactamente 5 dígitos.");
                 if(abonoInicialBs <= 0) return alert("Debe ingresar el monto del abono para liquidar la factura de contado.");
                 if(!fileInput.files[0]) return alert("Debe adjuntar la imagen del comprobante de pago.");
                 
-                // Verificar margen de exactitud del abono para dejar saldo en 0
-                if(Math.abs(abonoInicialBs - totalBs) > 0.1) {
-                    return alert(`Para facturar de contado, el abono ingresado (${abonoInicialBs.toFixed(2)} Bs) debe ser exactamente igual al total de la factura (${totalBs.toFixed(2)} Bs).`);
+                if(Math.abs(abonoInicialBs - totalNetoBs) > 0.1) {
+                    return alert(`Para facturar de contado, el abono ingresado (${abonoInicialBs.toFixed(2)} Bs) debe ser exactamente igual al total neto de la factura (${totalNetoBs.toFixed(2)} Bs).`);
                 }
             }
 
-            // Validar unicidad de referencia bancaria
             if(referencia !== "Ninguna" && esReferenciaInvalidaODuplicada(referencia)) {
-                return alert("ERROR: Esta referencia ya se encuentra registrada o coincide en sus últimos 5 números con otra operación.");
+                return alert("ERROR: Esta referencia de 5 dígitos ya se encuentra registrada en el sistema.");
             }
 
             encodeImageToBase64(fileInput, (base64Img) => {
@@ -751,31 +866,30 @@
                     fecha: timestamp,
                     items: carrito,
                     descuento: (descPorc * 100) + "%",
-                    totalUsd,
-                    totalBs,
+                    totalBrutoUsd: subtotalBrutoUsd,
+                    totalDescuentoUsd: totalDescuentoUsd,
+                    totalUsd: totalNetoUsd,
+                    totalBs: totalNetoBs,
                     tasa: tasaBcv,
                     totalCantidades,
                     abonos: []
                 };
 
-                // Si es contado, inyectar el abono inicial directamente al nodo estructurado para saldar la cuenta
                 if(condicion === 'contado') {
                     nuevaFacturaObj.abonos.push({
                         montoBs: abonoInicialBs,
-                        montoUsd: totalUsd,
+                        montoUsd: totalNetoUsd,
                         referencia: referencia,
                         fechaAbono: timestamp,
                         imgBase64: base64Img
                     });
                 }
 
-                // Descontar inventario de stock en la Base de Datos
                 carrito.forEach(item => {
                     const stockActualizado = productosCache[item.id].stock - item.cantidad;
                     set(ref(db, `almacen/${item.id}/stock`), stockActualizado);
                 });
 
-                // Guardar Factura
                 push(ref(db, 'facturas'), nuevaFacturaObj).then(() => {
                     imprimirFacturaCarta(nuevaFacturaObj);
                     limpiarCaja();
@@ -816,14 +930,21 @@
                 `;
             });
 
-            document.getElementById('tk-linea-descuento').innerText = f.descuento !== "0%" ? `Descuento Aplicado: -${f.descuento}` : '';
+            let brutoUsd = f.totalBrutoUsd || f.totalUsd;
+            let descUsd = f.totalDescuentoUsd || 0;
+            let brutoBs = brutoUsd * f.tasa;
+            let descBs = descUsd * f.tasa;
+
+            document.getElementById('tk-bruto-calc').innerText = `$${brutoUsd.toFixed(2)} | ${brutoBs.toFixed(2)} Bs`;
+            document.getElementById('tk-desc-calc').innerText = `-$${descUsd.toFixed(2)} | -${descBs.toFixed(2)} Bs (${f.descuento})`;
+
             document.getElementById('tk-total-usd').innerText = f.totalUsd.toFixed(2);
             document.getElementById('tk-total-bs').innerText = f.totalBs.toFixed(2);
 
             setTimeout(() => { window.print(); }, 400);
         }
 
-        // --- PESTAÑA HISTORIAL CON INTEGRACIÓN DE BÚSQUEDA FLATTENED DE REFERENCIAS ---
+        // --- PESTAÑA HISTORIAL ---
         function renderizarFacturasHistorico() {
             const container = document.getElementById('lista-facturas-historico');
             container.innerHTML = '';
@@ -831,21 +952,17 @@
             for(let key in facturasCache) {
                 const f = facturasCache[key];
                 
-                // Regla restrictiva por Rol de Vendedor
                 if(rolActivo === 'vendedor' && f.vendedor !== usuarioActivo) continue;
 
-                // Mapear todas las referencias de abonos para indexarlas en la búsqueda rápida de la caja de texto
-                let subAbonosRefsText = "";
-                if(f.abonos) {
-                    subAbonosRefsText = f.abonos.map(a => a.referencia).join(" ");
-                }
+                // Cálculo en bolívares dynamically recalculado según la tasa global viva
+                const totalBsDinamico = f.totalUsd * tasaBcv;
 
                 container.innerHTML += `
-                    <div class="card item-factura-row" data-search="${f.numero.toLowerCase()} ${f.vendedor.toLowerCase()} ${f.referencia.toLowerCase()} ${subAbonosRefsText.toLowerCase()}" style="cursor:pointer; border-left:5px solid var(--primary);" onclick="verDetalleFactura('${key}')">
+                    <div class="card item-factura-row" data-search="${f.numero.toLowerCase()} ${f.vendedor.toLowerCase()} ${f.referencia.toLowerCase()}" style="cursor:pointer; border-left:5px solid var(--primary);" onclick="verDetalleFactura('${key}')">
                         <strong>${f.numero}</strong> | Cliente: ${f.cliente}<br>
-                        <small>Vendedor: ${f.vendedor} | Ref Base: ${f.referencia}</small>
+                        <small>Vendedor: ${f.vendedor} | Refs: ${f.referencia}</small>
                         <div style="text-align:right; font-weight:bold; margin-top:-15px;">
-                            $${f.totalUsd.toFixed(2)} <br><span style="font-size:12px; color:#666;">${f.totalBs.toFixed(2)} Bs</span>
+                            $${f.totalUsd.toFixed(2)} <br><span style="font-size:12px; color:#666;">${totalBsDinamico.toFixed(2)} Bs</span>
                         </div>
                     </div>
                 `;
@@ -867,31 +984,37 @@
             let itemsList = "";
             f.items.forEach(i => itemsList += `<li>${i.cantidad}x ${i.nombre} - $${i.precio.toFixed(2)}</li>`);
 
+            // Total general recalculado a la tasa viva
+            const totalFacturaBsDinamico = f.totalUsd * tasaBcv;
+
             document.getElementById('detalle-contenido').innerHTML = `
                 <h4>Código Documento: ${f.numero}</h4>
                 <p><b>Fecha Emisión:</b> ${f.fecha}</p>
                 <p><b>Cliente:</b> ${f.cliente} | <b>Condición:</b> ${f.condicion.toUpperCase()}</p>
                 <p><b>Vendedor Facturador:</b> ${f.vendedor}</p>
-                <p><b>Referencia Inicial:</b> ${f.referencia}</p>
-                <p><b>Descuento:</b> ${f.descuento} (Tasa Operación: ${f.tasa} Bs)</p>
+                <p><b>Referencias Base Consolidadas:</b> ${f.referencia}</p>
+                <p><b>Descuento:</b> ${f.descuento} (Tasa Registro: ${f.tasa.toFixed(2)} Bs | Tasa Actual: ${tasaBcv.toFixed(2)} Bs)</p>
                 <ul>${itemsList}</ul>
-                <p><b>Monto Total Neto Factura:</b> $${f.totalUsd.toFixed(2)} (${f.totalBs.toFixed(2)} Bs)</p>
+                <p><b>Monto Total Neto Factura:</b> $${f.totalUsd.toFixed(2)} (${totalFacturaBsDinamico.toFixed(2)} Bs)</p>
             `;
 
-            // Cómputo de Saldos por amortizaciones sucesivas
-            let totalAbonadoBs = 0;
+            // Calcular deuda amortizada basada puramente en USD base
+            let totalAbonadoUsd = 0;
             if(f.abonos) {
-                f.abonos.forEach(ab => totalAbonadoBs += ab.montoBs);
+                f.abonos.forEach(ab => {
+                    totalAbonadoUsd += ab.montoUsd || (ab.montoBs / (f.tasa || 1));
+                });
             }
 
-            let saldoRestanteBs = f.totalBs - totalAbonadoBs;
-            if(saldoRestanteBs < 0) saldoRestanteBs = 0;
-            let saldoRestanteUsd = saldoRestanteBs / tasaBcv;
+            let saldoRestanteUsd = f.totalUsd - totalAbonadoUsd;
+            if(saldoRestanteUsd < 0) saldoRestanteUsd = 0;
+            
+            // El remanente en Bolívares fluctúa libremente según la tasaBCV asignada arriba
+            let saldoRestanteBs = saldoRestanteUsd * tasaBcv;
 
             document.getElementById('abono-saldo-restante-bs').innerText = saldoRestanteBs.toFixed(2);
             document.getElementById('abono-saldo-restante-usd').innerText = saldoRestanteUsd.toFixed(2);
 
-            // Galería con Visor Lightbox Zoom
             const compContainer = document.getElementById('lista-comprobantes-adjuntos');
             compContainer.innerHTML = '';
             if(f.abonos) {
@@ -901,7 +1024,7 @@
                         <div style="background:#f8f9fa; padding:5px; border:1px solid #ddd; border-radius:4px; font-size:11px; text-align:center;">
                             ${imgHtml}<br>
                             <b>Ref: ${ab.referencia}</b><br>
-                            ${ab.montoBs.toFixed(2)} Bs<br>($${ab.montoUsd.toFixed(2)})
+                            ${ab.montoBs.toFixed(2)} Bs<br>($${(ab.montoUsd || (ab.montoBs / (f.tasa || 1))).toFixed(2)})
                         </div>
                     `;
                 });
@@ -914,7 +1037,7 @@
             document.getElementById('abono-monto-usd').value = `$ ${equivalenteUsd.toFixed(2)}`;
         };
 
-        // --- SISTEMA DE REGISTRO DE ABONOS CON BARRA DE CARGA REALISTA ---
+        // --- SISTEMA DE REGISTRO DE ABONOS ---
         window.registrarNuevoAbono = function() {
             if(!idFacturaSeleccionada) return alert("Seleccione una factura.");
             const montoBs = parseFloat(document.getElementById('abono-monto-bs').value);
@@ -925,18 +1048,37 @@
                 return alert("Coloque un monto de abono válido y el número de referencia bancaria.");
             }
 
-            // Validar unicidad estricta y últimos 5 dígitos
+            if(referencia.length !== 5) {
+                return alert("La referencia debe tener exactamente 5 dígitos numéricos.");
+            }
+
             if(esReferenciaInvalidaODuplicada(referencia)) {
-                return alert("ERROR: Esta referencia ya existe o coincide en sus últimos 5 números con otra transacción registrada.");
+                return alert("ERROR: Esta referencia ya existe en el historial.");
+            }
+
+            let f = facturasCache[idFacturaSeleccionada];
+            
+            // Consolidar deuda restante en dólares antes de procesar el pago
+            let totalAbonadoUsd = 0;
+            if(f.abonos) {
+                f.abonos.forEach(ab => {
+                    totalAbonadoUsd += ab.montoUsd || (ab.montoBs / (f.tasa || 1));
+                });
+            }
+            let saldoRestanteUsd = f.totalUsd - totalAbonadoUsd;
+            let montoUsdAbono = montoBs / tasaBcv;
+
+            // Evitar sobrepagos causados por decimales flotantes
+            if(montoUsdAbono > (saldoRestanteUsd + 0.02)) {
+                return alert(`El abono de ${montoBs.toFixed(2)} Bs equivale a $${montoUsdAbono.toFixed(2)}, lo cual excede el saldo restante real indexado en dólares ($${saldoRestanteUsd.toFixed(2)}).`);
             }
 
             encodeImageToBase64(fileInput, (base64) => {
-                let f = facturasCache[idFacturaSeleccionada];
                 if(!f.abonos) f.abonos = [];
 
                 const nuevoAbonoNode = {
                     montoBs,
-                    montoUsd: (montoBs / tasaBcv),
+                    montoUsd: montoUsdAbono,
                     referencia,
                     fechaAbono: new Date().toLocaleString('es-VE'),
                     imgBase64: base64
@@ -944,7 +1086,13 @@
 
                 f.abonos.push(nuevoAbonoNode);
 
-                // Disparador Visual Animado de la Barra de Carga (Simulación síncrona/asíncrona del búfer)
+                // Concatenar en las referencias base separadas por guiones
+                if(!f.referencia || f.referencia === "Ninguna") {
+                    f.referencia = referencia;
+                } else {
+                    f.referencia = f.referencia + " - " + referencia;
+                }
+
                 const loadingContainer = document.getElementById('abono-loading-container');
                 const loadingBar = document.getElementById('abono-loading-bar');
                 
@@ -959,9 +1107,8 @@
                     if(progreso >= 100) {
                         clearInterval(intervalo);
                         
-                        // Guardar en Firebase una vez alcanzado el 100%
-                        set(ref(db, `facturas/${idFacturaSeleccionada}/abonos`), f.abonos).then(() => {
-                            alert("ABONO REGISTRADO");
+                        set(ref(db, `facturas/${idFacturaSeleccionada}`), f).then(() => {
+                            alert("ABONO REGISTRADO CON ÉXITO");
                             loadingContainer.style.display = 'none';
                             loadingBar.style.width = "0%";
                             
@@ -976,7 +1123,6 @@
             });
         };
 
-        // --- REIMPRESIÓN Y DESCARGA DIRECTA LOCAL ---
         window.reimprimirFacturaSeleccionada = function() {
             if(!idFacturaSeleccionada) return alert("Seleccione una factura.");
             imprimirFacturaCarta(facturasCache[idFacturaSeleccionada]);
@@ -986,7 +1132,6 @@
             if(!idFacturaSeleccionada) return alert("Seleccione una factura.");
             const f = facturasCache[idFacturaSeleccionada];
             
-            // Generamos una clonación limpia del HTML estructurado para descarga autónoma
             const htmlContent = `
                 <html>
                 <head><title>Factura_${f.numero}</title></head>
@@ -998,7 +1143,7 @@
                     <p><b>Fecha:</b> ${f.fecha}</p>
                     <p><b>Cliente:</b> ${f.cliente} | <b>Condición:</b> ${f.condicion.toUpperCase()}</p>
                     <p><b>Vendedor:</b> ${f.vendedor}</p>
-                    <p><b>Referencia Base:</b> ${f.referencia}</p>
+                    <p><b>Referencias Base:</b> ${f.referencia}</p>
                     <table border="1" cellpadding="8" style="border-collapse:collapse; width:100%; margin-top:20px;">
                         <thead><tr><th>Cantidad</th><th>Descripción</th><th>Precio $</th><th>Total $</th></tr></thead>
                         <tbody>
@@ -1031,6 +1176,23 @@
             reader.onloadend = () => callback(reader.result);
             reader.readAsDataURL(file);
         }
+        
+        window.guardarConfiguracion = function() {
+            const nombre = document.getElementById('conf-nombre').value.trim();
+            const rif = document.getElementById('conf-rif').value.trim();
+            const direccion = document.getElementById('conf-direccion').value.trim();
+            const contacto = document.getElementById('conf-contacto').value.trim();
+            const banca = document.getElementById('conf-banca').value.trim();
+            const logoFile = document.getElementById('conf-logo');
+
+            encodeImageToBase64(logoFile, (base64) => {
+                const configData = { nombre, rif, direccion, contacto, banca };
+                if(base64) configData.logo = base64;
+                else if(configCache.logo) configData.logo = configCache.logo;
+
+                set(ref(db, 'configuracion'), configData).then(() => alert("Parámetros guardados con éxito."));
+            });
+        };
     </script>
 </body>
 </html>
