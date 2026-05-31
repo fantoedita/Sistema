@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema Store - Control de Facturación Avanzado</title>
+    <title>Sistema Store - Control de Notas de Entrega</title>
     <style>
         :root { 
             --primary: #0056b3; 
@@ -92,7 +92,7 @@
         <div class="tabs">
             <button class="tab-btn active" id="nav-caja" onclick="switchTab('tab-caja')">Caja</button>
             <button class="tab-btn" id="nav-config" onclick="switchTab('tab-config')">Configuración</button>
-            <button class="tab-btn" id="nav-facturas" onclick="switchTab('tab-facturas')">Facturas & Abonos</button>
+            <button class="tab-btn" id="nav-facturas" onclick="switchTab('tab-facturas')">Notas de Entrega & Abonos</button>
             <button class="tab-btn" id="nav-personal" onclick="switchTab('tab-personal')">Personal & Almacén</button>
         </div>
         <div class="tasa-box">
@@ -119,7 +119,7 @@
             </div>
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3>Nueva Factura</h3>
+                    <h3>Nueva Nota de Entrega</h3>
                     <button class="btn btn-danger" onclick="limpiarCaja()">Limpiar Caja</button>
                 </div>
                 
@@ -164,7 +164,7 @@
                         </div>
                     </div>
                 </div>
-                <button class="btn btn-success btn-block" style="margin-top:15px;" onclick="procesarFacturacion()">FACTURAR & IMPRIMIR</button>
+                <button class="btn btn-success btn-block" style="margin-top:15px;" onclick="procesarFacturacion()">GENERAR & IMPRIMIR NOTA</button>
             </div>
         </div>
     </div>
@@ -190,7 +190,7 @@
     </div>
 
     <div id="tab-facturas" class="tab-content">
-        <input type="text" id="factura-buscador" class="search-bar" placeholder="🔍 Buscar por N° Factura, Referencias Bancarias (Cualquier Abono) o Vendedor..." oninput="filtrarFacturasHistorico()">
+        <input type="text" id="factura-buscador" class="search-bar" placeholder="🔍 Buscar por N° Nota, Referencias Bancarias (Cualquier Abono) o Vendedor..." oninput="filtrarFacturasHistorico()">
         <div class="grid-2">
             <div id="lista-facturas-historico"></div>
             
@@ -199,7 +199,7 @@
                     <button class="btn btn-primary" onclick="reimprimirFacturaSeleccionada()">🖨️ Imprimir</button>
                     <button class="btn btn-success" onclick="descargarFacturaArchivoLocal()">💾 Guardar en Equipo</button>
                 </div>
-                <h3>Detalles de la Factura</h3>
+                <h3>Detalles de la Nota de Entrega</h3>
                 <div id="detalle-contenido"></div>
                 <hr>
                 
@@ -311,7 +311,7 @@
                 <p style="margin:3px 0;">Telf: <span id="tk-tel"></span></p>
             </div>
             <div style="text-align: right;">
-                <h2 style="color: var(--primary); margin:0;">FACTURA</h2>
+                <h2 style="color: var(--primary); margin:0;">NOTA DE ENTREGA</h2>
                 <p style="font-size:16px; font-weight:bold; margin:5px 0;">N°: <span id="tk-num"></span></p>
                 <p style="margin:3px 0;">Fecha: <span id="tk-fecha"></span></p>
                 <p style="margin:3px 0;">Vendedor: <span id="tk-vend"></span></p>
@@ -361,7 +361,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getDatabase, ref, set, push, onValue, get, remove } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+        import { getDatabase, ref, set, push, onValue, get, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCgFJVToluiG3I-Lxml6cXmP-f2pMb0rxg",
@@ -845,7 +845,7 @@
                 if(!fileInput.files[0]) return alert("Debe adjuntar la imagen del comprobante de pago.");
                 
                 if(Math.abs(abonoInicialBs - totalNetoBs) > 0.1) {
-                    return alert(`Para facturar de contado, el abono ingresado (${abonoInicialBs.toFixed(2)} Bs) debe ser exactamente igual al total neto de la factura (${totalNetoBs.toFixed(2)} Bs).`);
+                    return alert(`Para facturar de contado, el abono ingresado (${abonoInicialBs.toFixed(2)} Bs) debe ser exactamente igual al total neto de la nota de entrega (${totalNetoBs.toFixed(2)} Bs).`);
                 }
             }
 
@@ -854,45 +854,51 @@
             }
 
             encodeImageToBase64(fileInput, (base64Img) => {
-                const nFactura = "FAC-" + Math.floor(100000 + Math.random() * 900000);
                 const timestamp = new Date().toLocaleString('es-VE');
 
-                const nuevaFacturaObj = {
-                    numero: nFactura,
-                    vendedor: usuarioActivo,
-                    cliente,
-                    condicion,
-                    referencia: referencia,
-                    fecha: timestamp,
-                    items: carrito,
-                    descuento: (descPorc * 100) + "%",
-                    totalBrutoUsd: subtotalBrutoUsd,
-                    totalDescuentoUsd: totalDescuentoUsd,
-                    totalUsd: totalNetoUsd,
-                    totalBs: totalNetoBs,
-                    tasa: tasaBcv,
-                    totalCantidades,
-                    abonos: []
-                };
+                // Lógica de Numeración Secuencial con Firebase
+                runTransaction(ref(db, 'contadorNotas'), (current) => {
+                    return (current || 0) + 1;
+                }).then((result) => {
+                    const nFactura = result.snapshot.val().toString().padStart(7, '0');
 
-                if(condicion === 'contado') {
-                    nuevaFacturaObj.abonos.push({
-                        montoBs: abonoInicialBs,
-                        montoUsd: totalNetoUsd,
+                    const nuevaFacturaObj = {
+                        numero: nFactura,
+                        vendedor: usuarioActivo,
+                        cliente,
+                        condicion,
                         referencia: referencia,
-                        fechaAbono: timestamp,
-                        imgBase64: base64Img
+                        fecha: timestamp,
+                        items: carrito,
+                        descuento: (descPorc * 100) + "%",
+                        totalBrutoUsd: subtotalBrutoUsd,
+                        totalDescuentoUsd: totalDescuentoUsd,
+                        totalUsd: totalNetoUsd,
+                        totalBs: totalNetoBs,
+                        tasa: tasaBcv,
+                        totalCantidades,
+                        abonos: []
+                    };
+
+                    if(condicion === 'contado') {
+                        nuevaFacturaObj.abonos.push({
+                            montoBs: abonoInicialBs,
+                            montoUsd: totalNetoUsd,
+                            referencia: referencia,
+                            fechaAbono: timestamp,
+                            imgBase64: base64Img
+                        });
+                    }
+
+                    carrito.forEach(item => {
+                        const stockActualizado = productosCache[item.id].stock - item.cantidad;
+                        set(ref(db, `almacen/${item.id}/stock`), stockActualizado);
                     });
-                }
 
-                carrito.forEach(item => {
-                    const stockActualizado = productosCache[item.id].stock - item.cantidad;
-                    set(ref(db, `almacen/${item.id}/stock`), stockActualizado);
-                });
-
-                push(ref(db, 'facturas'), nuevaFacturaObj).then(() => {
-                    imprimirFacturaCarta(nuevaFacturaObj);
-                    limpiarCaja();
+                    push(ref(db, 'facturas'), nuevaFacturaObj).then(() => {
+                        imprimirFacturaCarta(nuevaFacturaObj);
+                        limpiarCaja();
+                    });
                 });
             });
         };
@@ -995,7 +1001,7 @@
                 <p><b>Referencias Base Consolidadas:</b> ${f.referencia}</p>
                 <p><b>Descuento:</b> ${f.descuento} (Tasa Registro: ${f.tasa.toFixed(2)} Bs | Tasa Actual: ${tasaBcv.toFixed(2)} Bs)</p>
                 <ul>${itemsList}</ul>
-                <p><b>Monto Total Neto Factura:</b> $${f.totalUsd.toFixed(2)} (${totalFacturaBsDinamico.toFixed(2)} Bs)</p>
+                <p><b>Monto Total Neto:</b> $${f.totalUsd.toFixed(2)} (${totalFacturaBsDinamico.toFixed(2)} Bs)</p>
             `;
 
             // Calcular deuda amortizada basada puramente en USD base
@@ -1039,7 +1045,7 @@
 
         // --- SISTEMA DE REGISTRO DE ABONOS ---
         window.registrarNuevoAbono = function() {
-            if(!idFacturaSeleccionada) return alert("Seleccione una factura.");
+            if(!idFacturaSeleccionada) return alert("Seleccione una nota de entrega.");
             const montoBs = parseFloat(document.getElementById('abono-monto-bs').value);
             const referencia = document.getElementById('abono-ref-num').value.trim();
             const fileInput = document.getElementById('abono-file');
@@ -1124,35 +1130,126 @@
         };
 
         window.reimprimirFacturaSeleccionada = function() {
-            if(!idFacturaSeleccionada) return alert("Seleccione una factura.");
+            if(!idFacturaSeleccionada) return alert("Seleccione una nota de entrega.");
             imprimirFacturaCarta(facturasCache[idFacturaSeleccionada]);
         };
 
         window.descargarFacturaArchivoLocal = function() {
-            if(!idFacturaSeleccionada) return alert("Seleccione una factura.");
+            if(!idFacturaSeleccionada) return alert("Seleccione una nota de entrega.");
             const f = facturasCache[idFacturaSeleccionada];
             
+            let brutoUsd = f.totalBrutoUsd || f.totalUsd;
+            let descUsd = f.totalDescuentoUsd || 0;
+            let brutoBs = brutoUsd * f.tasa;
+            let descBs = descUsd * f.tasa;
+            
+            let logoHtml = configCache.logo ? `<img src="${configCache.logo}" style="max-height: 70px; margin-bottom: 10px;">` : '';
+
             const htmlContent = `
-                <html>
-                <head><title>Factura_${f.numero}</title></head>
-                <body style="font-family:Arial; padding:40px;">
-                    <h2>${configCache.nombre || 'EMPRESA'}</h2>
-                    <p><b>RIF:</b> ${configCache.rif}</p>
-                    <hr>
-                    <h3>FACTURA N°: ${f.numero}</h3>
-                    <p><b>Fecha:</b> ${f.fecha}</p>
-                    <p><b>Cliente:</b> ${f.cliente} | <b>Condición:</b> ${f.condicion.toUpperCase()}</p>
-                    <p><b>Vendedor:</b> ${f.vendedor}</p>
-                    <p><b>Referencias Base:</b> ${f.referencia}</p>
-                    <table border="1" cellpadding="8" style="border-collapse:collapse; width:100%; margin-top:20px;">
-                        <thead><tr><th>Cantidad</th><th>Descripción</th><th>Precio $</th><th>Total $</th></tr></thead>
-                        <tbody>
-                            ${f.items.map(i => `<tr><td>${i.cantidad}</td><td>${i.nombre}</td><td>$${i.precio.toFixed(2)}</td><td>$${(i.precio*i.cantidad).toFixed(2)}</td></tr>`).join('')}
-                        </tbody>
-                    </table>
-                    <h3 style="text-align:right; margin-top:20px;">TOTAL NETO USD: $${f.totalUsd.toFixed(2)}</h3>
-                    <h3 style="text-align:right;">TOTAL NETO BS: ${f.totalBs.toFixed(2)} Bs</h3>
-                    <center style="margin-top:40px;"><h4>¡GRACIAS POR SU COMPRA!</h4></center>
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Nota_Entrega_${f.numero}</title>
+                    <style>
+                        body { 
+                            font-family: Arial, sans-serif; 
+                            background: #525659; 
+                            display: flex; 
+                            justify-content: center; 
+                            padding: 20px; 
+                            margin: 0; 
+                        }
+                        .factura-carta { 
+                            width: 215mm; 
+                            min-height: 279mm; 
+                            padding: 20mm; 
+                            background: white; 
+                            box-sizing: border-box; 
+                            font-size: 14px; 
+                            line-height: 1.5; 
+                            color: #000; 
+                            box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+                        }
+                        .factura-header { display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px; }
+                        .factura-totales-box { display: flex; justify-content: flex-end; margin-top: 30px; }
+                        .tabla-carta { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                        .tabla-carta th { background: #f2f2f2; border: 1px solid #000; padding: 8px; text-align: left; }
+                        .tabla-carta td { border: 1px solid #000; padding: 8px; text-align: left; }
+                        
+                        @media print {
+                            body { background: white; padding: 0; display: block; }
+                            .factura-carta { box-shadow: none; width: 100%; min-height: auto; padding: 0; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="factura-carta">
+                        <div class="factura-header">
+                            <div>
+                                ${logoHtml}
+                                <h2 style="margin:0;">${configCache.nombre || "Nuestra Empresa C.A."}</h2>
+                                <p style="margin:3px 0;">RIF: ${configCache.rif || "J-0000000"}</p>
+                                <p style="margin:3px 0;">Dirección: ${configCache.direccion || "Ubicación"}</p>
+                                <p style="margin:3px 0;">Telf: ${configCache.contacto || "Contacto"}</p>
+                            </div>
+                            <div style="text-align: right;">
+                                <h2 style="color: #0056b3; margin:0;">NOTA DE ENTREGA</h2>
+                                <p style="font-size:16px; font-weight:bold; margin:5px 0;">N°: ${f.numero}</p>
+                                <p style="margin:3px 0;">Fecha: ${f.fecha}</p>
+                                <p style="margin:3px 0;">Vendedor: ${f.vendedor}</p>
+                                <p style="margin:3px 0;">Cliente: ${f.cliente}</p>
+                                <p style="margin:3px 0;">Condición: ${f.condicion.toUpperCase()}</p>
+                                <p style="margin:3px 0;">Ref Base: ${f.referencia}</p>
+                            </div>
+                        </div>
+
+                        <table class="tabla-carta">
+                            <thead>
+                                <tr>
+                                    <th>Cantidad</th>
+                                    <th>Descripción del Producto</th>
+                                    <th>Precio Unitario ($)</th>
+                                    <th>Subtotal ($)</th>
+                                    <th>Subtotal (Bs)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${f.items.map(i => `
+                                    <tr>
+                                        <td>${i.cantidad}</td>
+                                        <td>${i.nombre}</td>
+                                        <td>$${i.precio.toFixed(2)}</td>
+                                        <td>$${(i.precio * i.cantidad).toFixed(2)}</td>
+                                        <td>${(i.precio * i.cantidad * f.tasa).toFixed(2)} Bs</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+
+                        <div class="factura-totales-box">
+                            <div style="width: 480px; font-size: 14px; text-align: right; line-height: 1.8;">
+                                <div>Total Productos Facturados: <span style="font-weight:bold;">${f.totalCantidades}</span></div>
+                                
+                                <div style="margin-top: 5px; border-top: 1px dotted #888; padding-top: 5px; color:#444;">
+                                    <div style="font-weight: bold;">Monto Total Bruto (Sin Descuento): $${brutoUsd.toFixed(2)} | ${brutoBs.toFixed(2)} Bs</div>
+                                    <div style="color: #dc3545;">Descuentos Deducidos: -$${descUsd.toFixed(2)} | -${descBs.toFixed(2)} Bs (${f.descuento})</div>
+                                </div>
+
+                                <div style="font-size: 18px; font-weight: bold; border-top: 1px solid #000; margin-top: 5px; padding-top: 5px;">
+                                    TOTAL NETO: $${f.totalUsd.toFixed(2)}
+                                </div>
+                                <div style="font-size: 18px; font-weight: bold;">
+                                    TOTAL NETO: ${f.totalBs.toFixed(2)} Bs
+                                </div>
+                                <div style="font-size: 12px; color: #444;">Tasa de cambio oficial: ${f.tasa.toFixed(2)} Bs/$</div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 50px; text-align: center; font-weight: bold; border-top: 1px dashed #ccc; padding-top: 20px;">
+                            ¡GRACIAS POR SU COMPRA!
+                        </div>
+                    </div>
                 </body>
                 </html>
             `;
@@ -1160,7 +1257,7 @@
             const blob = new Blob([htmlContent], { type: 'text/html' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `Factura_${f.numero}.html`;
+            link.download = `NotaEntrega_${f.numero}.html`;
             link.click();
         };
 
