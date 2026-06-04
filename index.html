@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>O R I E N T E  8 8</title>
+    <title>Sistema Store - Control de Notas de Entrega</title>
     <style>
         :root { 
             --primary: #0056b3; 
@@ -190,6 +190,14 @@
     </div>
 
     <div id="tab-facturas" class="tab-content">
+        <div id="panel-comisiones" style="background: #d4edda; color: #155724; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #c3e6cb; display: none;">
+            <h4 style="margin: 0 0 5px 0;">💰 Panel de Comisiones Acumuladas (<span id="comision-porcentaje-display">10</span>%)</h4>
+            <div style="font-size: 14px; margin-bottom: 5px;">Aplica solo para notas de entrega 100% liquidadas.</div>
+            <div style="font-size: 16px; font-weight: bold;">
+                Total Ganado: <span id="total-comisiones-usd">$0.00</span> | <span id="total-comisiones-bs">0.00 Bs</span>
+            </div>
+        </div>
+
         <input type="text" id="factura-buscador" class="search-bar" placeholder="🔍 Buscar por N° Nota, Referencias Bancarias (Cualquier Abono) o Vendedor..." oninput="filtrarFacturasHistorico()">
         <div class="grid-2">
             <div id="lista-facturas-historico"></div>
@@ -203,6 +211,8 @@
                 <div id="detalle-contenido"></div>
                 <hr>
                 
+                <div id="status-comision-factura"></div>
+
                 <h4>Módulo de Abonos & Amortizaciones</h4>
                 <div style="background: #fff3cd; padding: 10px; border-radius: 4px; font-weight: bold; margin-bottom: 10px;">
                     Saldo Restante: <span id="abono-saldo-restante-bs">0.00</span> Bs (<span id="abono-saldo-restante-usd">0.00</span> $)
@@ -387,6 +397,8 @@
         let personalCache = {};
         let idFacturaSeleccionada = null;
 
+        const PORCENTAJE_COMISION = 0.10;
+
         window.onload = () => {
             obtenerTasaBCVOficialDolarApi();
             inicializarEscuchasBaseDatos();
@@ -487,7 +499,9 @@
                 document.getElementById('login-pass').value = '';
                 document.getElementById('display-user-nav').innerText = `👤 ${usuarioActivo} [${rolActivo.toUpperCase()}]`;
 
-                // REGLA INTEGRADA DE ACCESO: SOLO ADMINISTRADORES PUEDEN CAMBIAR LA TASA
+                // Renderizar las facturas ahora que sabemos el rol del usuario
+                renderizarFacturasHistorico();
+
                 const inputTasaElement = document.getElementById('global-tasa');
                 if(rolActivo === 'administrador') {
                     inputTasaElement.disabled = false;
@@ -509,7 +523,6 @@
                     document.getElementById('nav-personal').style.display = 'block';
                 }
 
-                // Restricciones de visualización del formulario de creación interna
                 if(rolActivo === 'administrador' || rolActivo === 'gerente') {
                     document.getElementById('personal-form-container').style.display = 'block';
                     document.getElementById('personal-denegado-msg').style.display = 'none';
@@ -528,6 +541,9 @@
             document.getElementById('login-overlay').style.display = 'flex';
             usuarioActivo = null;
             rolActivo = null;
+            
+            // Limpiar la vista de facturas al salir para proteger datos
+            renderizarFacturasHistorico();
         };
 
         window.agregarPersonal = function() {
@@ -683,7 +699,6 @@
                 barcodeInput.value = '';
                 barcodeInput.focus();
             } else {
-                // Fallback consulta a API pública externa si no existe localmente
                 fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`)
                     .then(res => res.json())
                     .then(data => {
@@ -779,7 +794,6 @@
             let totalDescuentoBs = totalDescuentoUsd * tasaBcv;
             let totalNetoBs = totalNetoUsd * tasaBcv;
 
-            // Inyección en pantalla del desglose detallado
             document.getElementById('bruto-dinamico-txt').innerText = `$${subtotalBrutoUsd.toFixed(2)} | ${subtotalBrutoBs.toFixed(2)} Bs`;
             document.getElementById('descuento-dinamico-txt').innerText = `-$${totalDescuentoUsd.toFixed(2)} | -${totalDescuentoBs.toFixed(2)} Bs (-${descuentoPorc*100}%)`;
             document.getElementById('total-usd').innerText = totalNetoUsd.toFixed(2);
@@ -856,7 +870,6 @@
             encodeImageToBase64(fileInput, (base64Img) => {
                 const timestamp = new Date().toLocaleString('es-VE');
 
-                // Lógica de Numeración Secuencial con Firebase
                 runTransaction(ref(db, 'contadorNotas'), (current) => {
                     return (current || 0) + 1;
                 }).then((result) => {
@@ -954,24 +967,52 @@
         function renderizarFacturasHistorico() {
             const container = document.getElementById('lista-facturas-historico');
             container.innerHTML = '';
-            
+            let totalComisionesGeneradas = 0;
+
             for(let key in facturasCache) {
                 const f = facturasCache[key];
                 
                 if(rolActivo === 'vendedor' && f.vendedor !== usuarioActivo) continue;
 
-                // Cálculo en bolívares dynamically recalculado según la tasa global viva
+                // Calcular deuda para verificar si genera comisión
+                let totalAbonadoUsd = 0;
+                if(f.abonos) {
+                    f.abonos.forEach(ab => {
+                        totalAbonadoUsd += ab.montoUsd || (ab.montoBs / (f.tasa || 1));
+                    });
+                }
+                
+                let saldoRestanteUsd = f.totalUsd - totalAbonadoUsd;
+                let estaPagada = saldoRestanteUsd <= 0.05; // Margen de seguridad para decimales
+
+                let badgeComision = "";
+                if(estaPagada) {
+                    let comision = f.totalUsd * PORCENTAJE_COMISION;
+                    totalComisionesGeneradas += comision;
+                    badgeComision = `<br><span style="color:var(--success); font-weight:bold; font-size:12px;">💰 Comisión: $${comision.toFixed(2)}</span>`;
+                }
+
+                // Cálculo en bolívares dinamico
                 const totalBsDinamico = f.totalUsd * tasaBcv;
 
                 container.innerHTML += `
-                    <div class="card item-factura-row" data-search="${f.numero.toLowerCase()} ${f.vendedor.toLowerCase()} ${f.referencia.toLowerCase()}" style="cursor:pointer; border-left:5px solid var(--primary);" onclick="verDetalleFactura('${key}')">
+                    <div class="card item-factura-row" data-search="${f.numero.toLowerCase()} ${f.vendedor.toLowerCase()} ${f.referencia.toLowerCase()}" style="cursor:pointer; border-left:5px solid ${estaPagada ? 'var(--success)' : 'var(--primary)'};" onclick="verDetalleFactura('${key}')">
                         <strong>${f.numero}</strong> | Cliente: ${f.cliente}<br>
                         <small>Vendedor: ${f.vendedor} | Refs: ${f.referencia}</small>
-                        <div style="text-align:right; font-weight:bold; margin-top:-15px;">
+                        ${badgeComision}
+                        <div style="text-align:right; font-weight:bold; margin-top:${estaPagada ? '-30px' : '-15px'};">
                             $${f.totalUsd.toFixed(2)} <br><span style="font-size:12px; color:#666;">${totalBsDinamico.toFixed(2)} Bs</span>
                         </div>
                     </div>
                 `;
+            }
+
+            // Reflejar totales en el panel superior
+            if(document.getElementById('panel-comisiones')) {
+                document.getElementById('panel-comisiones').style.display = 'block';
+                document.getElementById('comision-porcentaje-display').innerText = (PORCENTAJE_COMISION * 100).toFixed(0);
+                document.getElementById('total-comisiones-usd').innerText = `$${totalComisionesGeneradas.toFixed(2)}`;
+                document.getElementById('total-comisiones-bs').innerText = `${(totalComisionesGeneradas * tasaBcv).toFixed(2)} Bs`;
             }
         }
 
@@ -990,7 +1031,6 @@
             let itemsList = "";
             f.items.forEach(i => itemsList += `<li>${i.cantidad}x ${i.nombre} - $${i.precio.toFixed(2)}</li>`);
 
-            // Total general recalculado a la tasa viva
             const totalFacturaBsDinamico = f.totalUsd * tasaBcv;
 
             document.getElementById('detalle-contenido').innerHTML = `
@@ -1004,7 +1044,6 @@
                 <p><b>Monto Total Neto:</b> $${f.totalUsd.toFixed(2)} (${totalFacturaBsDinamico.toFixed(2)} Bs)</p>
             `;
 
-            // Calcular deuda amortizada basada puramente en USD base
             let totalAbonadoUsd = 0;
             if(f.abonos) {
                 f.abonos.forEach(ab => {
@@ -1014,12 +1053,26 @@
 
             let saldoRestanteUsd = f.totalUsd - totalAbonadoUsd;
             if(saldoRestanteUsd < 0) saldoRestanteUsd = 0;
-            
-            // El remanente en Bolívares fluctúa libremente según la tasaBCV asignada arriba
             let saldoRestanteBs = saldoRestanteUsd * tasaBcv;
 
             document.getElementById('abono-saldo-restante-bs').innerText = saldoRestanteBs.toFixed(2);
             document.getElementById('abono-saldo-restante-usd').innerText = saldoRestanteUsd.toFixed(2);
+
+            // Lógica de la comisión dentro del detalle
+            const comisionBox = document.getElementById('status-comision-factura');
+            if(saldoRestanteUsd <= 0.05) {
+                let comision = f.totalUsd * PORCENTAJE_COMISION;
+                comisionBox.innerHTML = `
+                    <div style="background: #d4edda; padding: 10px; border-radius: 4px; border: 1px solid #c3e6cb; margin-bottom: 15px;">
+                        <strong style="color: #155724;">✅ Nota Totalmente Pagada</strong><br>
+                        <span style="color: #155724;">Comisión Generada para <b>${f.vendedor}</b> (${(PORCENTAJE_COMISION*100).toFixed(0)}%): <b>$${comision.toFixed(2)}</b> | <b>${(comision * tasaBcv).toFixed(2)} Bs</b></span>
+                    </div>`;
+            } else {
+                comisionBox.innerHTML = `
+                    <div style="background: #e2e3e5; padding: 10px; border-radius: 4px; color: #383d41; margin-bottom: 15px; font-size: 13px; border: 1px solid #d6d8db;">
+                        ⏳ La comisión de esta nota se liberará automáticamente cuando el saldo restante sea $0.00.
+                    </div>`;
+            }
 
             const compContainer = document.getElementById('lista-comprobantes-adjuntos');
             compContainer.innerHTML = '';
@@ -1059,7 +1112,7 @@
             }
 
             if(esReferenciaInvalidaODuplicada(referencia)) {
-                return alert("ERROR: Esta referencia ya existe en el historial.");
+                return alert("ERROR: Esta referencia ya existe del historial.");
             }
 
             let f = facturasCache[idFacturaSeleccionada];
