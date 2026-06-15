@@ -11,15 +11,16 @@
             --danger: #dc3545;
             --dark: #23272b; 
             --light: #f8f9fa; 
+            --warning: #ffc107;
         }
         body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #f1f3f6; color: #333; }
         
         /* Login Overlay */
-        #login-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; }
-        .login-box { background: white; padding: 30px; border-radius: 8px; width: 360px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        #login-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 15px; box-sizing: border-box; }
+        .login-box { background: white; padding: 30px; border-radius: 8px; width: 100%; max-width: 360px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.3); box-sizing: border-box; }
 
         /* Navbar con Menú Hamburguesa Reparado */
-        .navbar { display: flex; background: var(--dark); color: white; padding: 10px 20px; justify-content: space-between; align-items: center; position: relative; }
+        .navbar { display: flex; background: var(--dark); color: white; padding: 10px 20px; justify-content: space-between; align-items: center; position: relative; flex-wrap: wrap; gap: 10px; }
         .menu-toggle { background: none; border: none; color: white; font-size: 24px; cursor: pointer; display: block; }
         .nav-content { display: none; flex-direction: column; position: absolute; top: 100%; left: 0; width: 100%; background: var(--dark); padding: 15px 20px; box-sizing: border-box; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.3); gap: 15px; }
         .nav-content.active { display: flex; }
@@ -28,28 +29,29 @@
         .tab-btn { background: rgba(255,255,255,0.1); border: none; color: white; padding: 12px 15px; cursor: pointer; font-size: 15px; font-weight: 600; transition: 0.3s; text-align: left; border-radius: 4px; }
         .tab-btn.active, .tab-btn:hover { background: var(--primary); }
         
-        /* ESTA LÍNEA ES LA QUE EVITA QUE SE APILEN LAS PANTALLAS */
-        .tab-content { display: none; padding: 20px; max-width: 1400px; margin: auto; }
+        /* Contenedores Principales */
+        .tab-content { display: none; padding: 20px; max-width: 1400px; margin: auto; box-sizing: border-box; }
         .tab-content.active { display: block; }
 
-        .tasa-box { background: #fff; padding: 5px 15px; border-radius: 20px; display: flex; align-items: center; gap: 8px; font-weight: bold; color: #333; }
+        .tasa-box { background: #fff; padding: 5px 15px; border-radius: 20px; display: flex; align-items: center; gap: 8px; font-weight: bold; color: #333; box-sizing: border-box; }
         .tasa-box input { width: 70px; padding: 3px; text-align: center; font-weight: bold; transition: 0.2s; }
 
         /* Componentes */
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); margin-bottom: 20px; box-sizing: border-box; overflow: hidden; }
         .grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
         .grid-equal { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .input-field { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
-        .search-bar { width: 100%; padding: 12px; font-size: 15px; margin-bottom: 15px; border-radius: 6px; border: 1px solid #bbb; }
+        .search-bar { width: 100%; padding: 12px; font-size: 15px; margin-bottom: 15px; border-radius: 6px; border: 1px solid #bbb; box-sizing: border-box; }
         
-        .btn { padding: 10px 15px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; color: white; transition: 0.2s; }
+        .btn { padding: 10px 15px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; color: white; transition: 0.2s; box-sizing: border-box; text-align: center; }
         .btn-block { width: 100%; display: block; padding: 12px; font-size: 16px; }
         .btn-primary { background: var(--primary); }
         .btn-success { background: var(--success); }
         .btn-danger { background: var(--danger); }
+        .btn:hover { opacity: 0.9; }
 
         /* Tablas e Items */
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; font-size: 14px; }
         table th, table td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
         table th { background: #e9ecef; }
         
@@ -57,115 +59,113 @@
         .prod-item { background: #fff; padding: 12px; border-radius: 6px; border: 1px solid #cee0f5; text-align: center; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
         .prod-item:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: #fbfdff; }
 
-        /* Barra de Carga */
+        /* Barra de Carga y Visor */
         .progress-wrapper { width: 100%; background: #eee; border-radius: 4px; margin: 10px 0; display: none; }
         .progress-bar { width: 0%; height: 20px; background: var(--success); text-align: center; color: white; line-height: 20px; font-size: 12px; border-radius: 4px; transition: width 0.1s; }
-
-        /* Visor de Imagen */
         .lightbox { display: none; position: fixed; z-index: 10000; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; }
         .lightbox img { max-width: 90%; max-height: 90%; border-radius: 5px; }
 
         /* DISEÑO NOTA DE ENTREGA TIPO TICKET DE SUPERMERCADO VERTICAL */
         #factura-carta { 
-            display: none; 
-            width: 120mm; /* Ancho estándar idóneo para ticketera térmica de 80mm */
-            margin: 0 auto;
-            padding: 10px 5px; 
-            background: white; 
-            box-sizing: border-box; 
-            font-family: 'Courier New', Courier, monospace; 
-            font-size: 12px; 
-            line-height: 1.4; 
-            color: #000;
-            font-weight: bold; 
+            display: none; width: 120mm; margin: 0 auto; padding: 10px 5px; background: white; box-sizing: border-box; font-family: 'Courier New', Courier, monospace; font-size: 12px; line-height: 1.4; color: #000; font-weight: bold; 
         }
-        .factura-header { 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            text-align: center; 
-            border-bottom: 1px dashed #000; 
-            padding-bottom: 8px; 
-            margin-bottom: 10px; 
-        }
-        .factura-header div { 
-            text-align: center; 
-            width: 100% !important; 
-        }
-        .factura-header div:last-child { 
-            text-align: left !important; 
-            margin-top: 8px; 
-            border-top: 1px dashed #000; 
-            padding-top: 8px; 
-        }
-        .factura-header h2 {
-            font-size: 14px;
-            margin: 3px 0;
-            font-weight: bold;
-        }
-        .factura-header p {
-            margin: 2px 0;
-            font-size: 14px;
-        }
-        .tabla-carta { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-top: 5px; 
-            font-size: 14px;
-        }
-        .tabla-carta th { 
-            background: none !important; 
-            border-top: 1px dashed #000; 
-            border-bottom: 1px dashed #000; 
-            border-left: none !important;
-            border-right: none !important;
-            padding: 4px 1px; 
-            font-weight: bold;
-        }
-        /* Distribución de anchos para las columnas del ticket */
+        .factura-header { display: flex; flex-direction: column; align-items: center; text-align: center; border-bottom: 1px dashed #000; padding-bottom: 8px; margin-bottom: 10px; }
+        .factura-header div { text-align: center; width: 100% !important; }
+        .factura-header div:last-child { text-align: left !important; margin-top: 8px; border-top: 1px dashed #000; padding-top: 8px; }
+        .factura-header h2 { font-size: 14px; margin: 3px 0; font-weight: bold; }
+        .factura-header p { margin: 2px 0; font-size: 14px; }
+        .tabla-carta { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 14px; }
+        .tabla-carta th { background: none !important; border-top: 1px dashed #000; border-bottom: 1px dashed #000; border-left: none !important; border-right: none !important; padding: 4px 1px; font-weight: bold; }
         .tabla-carta th:nth-child(1), .tabla-carta td:nth-child(1) { text-align: center; width: 10%; }
         .tabla-carta th:nth-child(2), .tabla-carta td:nth-child(2) { text-align: left; width: 40%; }
         .tabla-carta th:nth-child(3), .tabla-carta td:nth-child(3) { text-align: right; width: 15%; }
         .tabla-carta th:nth-child(4), .tabla-carta td:nth-child(4) { text-align: right; width: 17%; }
         .tabla-carta th:nth-child(5), .tabla-carta td:nth-child(5) { text-align: right; width: 18%; }
-        
-        .tabla-carta td { 
-            border: none !important; 
-            padding: 3px 1px; 
-            vertical-align: top;
-            word-break: break-word;
-        }
-        .factura-totales-box { 
-            display: block !important; 
-            margin-top: 10px; 
-            border-top: 1px dashed #000; 
-            padding-top: 6px; 
-        }
-        .factura-totales-box > div { 
-            width: 100% !important; 
-            text-align: right !important; 
-            font-size: 11px;
-            line-height: 1.4;
-        }
-        .factura-totales-box div span {
-            font-weight: bold;
-        }
+        .tabla-carta td { border: none !important; padding: 3px 1px; vertical-align: top; word-break: break-word; }
+        .factura-totales-box { display: block !important; margin-top: 10px; border-top: 1px dashed #000; padding-top: 6px; }
+        .factura-totales-box > div { width: 100% !important; text-align: right !important; font-size: 11px; line-height: 1.4; }
+        .factura-totales-box div span { font-weight: bold; }
 
         @media print {
             body * { visibility: hidden; }
             #factura-carta, #factura-carta * { visibility: visible; }
-            #factura-carta { 
-                display: block; 
-                position: absolute; 
-                left: 0; 
-                top: 0; 
-                width: 120mm; 
-                padding: 0;
-                margin: 0;
+            #factura-carta { display: block; position: absolute; left: 0; top: 0; width: 120mm; padding: 0; margin: 0; }
+            @page { size: auto; margin: 0mm; }
+        }
+
+        /* ============================================================ */
+        /* 📱 ADAPTACIÓN RESPONSIVA PARA MÓVILES Y PANTALLAS PEQUEÑAS 📱 */
+        /* ============================================================ */
+        
+        @media screen and (max-width: 850px) {
+            /* 1. Volver las cuadrículas de 2 columnas a 1 sola columna */
+            .grid-2, .grid-equal { 
+                grid-template-columns: 1fr !important; 
             }
-            @page {
-                size: auto;
-                margin: 0mm;
+
+            /* 2. Ajustar la barra de navegación superior (Menú) */
+            .navbar { 
+                flex-direction: column; 
+                text-align: center; 
+                gap: 10px; 
+            }
+            .navbar h3 { 
+                margin-bottom: 5px !important; 
+                font-size: 18px; 
+            }
+            .menu-toggle { 
+                width: 100%; 
+                border: 1px solid rgba(255,255,255,0.4); 
+                border-radius: 4px; 
+                padding: 5px; 
+            }
+            
+            /* 3. Panel desplegable del menú (Botones de Tasa y Salir) */
+            .nav-content > div:last-child { 
+                flex-direction: column; 
+                gap: 10px; 
+                align-items: stretch !important; 
+            }
+            .tasa-box { 
+                width: 100%; 
+                justify-content: center; 
+            }
+
+            /* 4. Contenedores y Tarjetas adaptadas al ancho */
+            .tab-content { padding: 10px; }
+            .card { padding: 15px; margin-bottom: 15px; }
+
+            /* 5. Flexbox que se desbordan (Forzar el salto de línea elegante) */
+            .card > div[style*="display: flex"] { 
+                flex-wrap: wrap; 
+                gap: 10px; 
+            }
+
+            /* 6. El buscador de código de barras en vertical */
+            #barcode-scanner-horizontal { 
+                flex-direction: column; 
+                align-items: stretch !important; 
+            }
+            
+            /* 7. Tablas responsivas: Habilita Scroll lateral sin romper la tarjeta */
+            table { 
+                display: block; 
+                width: 100%; 
+                overflow-x: auto; 
+                white-space: nowrap; 
+                -webkit-overflow-scrolling: touch; 
+            }
+
+            /* 8. Modales (Pop-ups de Clientes y Facturas) centrados y ocupando pantalla */
+            div[id^="modal-"] > div, #detalle-factura-card > div { 
+                width: 95% !important; 
+                max-width: 100% !important; 
+                padding: 15px !important; 
+            }
+            
+            /* 9. Botones compartidos en modales apilados (Guardar / Imprimir) */
+            div[style*="display:flex; gap:10px; margin-bottom: 15px;"] {
+                flex-direction: column;
             }
         }
     </style>
