@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema Store - Control de Notas de Entrega</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     
 <style>
         :root { 
@@ -271,6 +272,8 @@
                     <button class="btn btn-primary" onclick="verificarClienteCaja(document.getElementById('caja-cliente').value)">Buscar / Validar</button>
                 </div>
 
+                <button id="btn-pago-bdv" class="btn btn-block" style="display: none; background: #006bb3; color: white; margin-bottom: 15px; font-size: 16px; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 2px solid #0056b3;" onclick="procesarPagoBDV()">📱 PAGAR CON BDV</button>
+
                 <div id="bloque-condiciones-pago">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
                         <label style="margin: 0;">Condición de Pago:</label>
@@ -313,7 +316,7 @@
     </div>
 
                     <label>Adjuntar Comprobante (Imagen) <span id="caja-comprobante-opcional" style="color:#666; font-size:12px;">(Opcional)</span>:</label>
-                    <input type="file" id="caja-comprobante-file" class="input-field" accept="image/*">
+                    <input type="file" id="caja-comprobante-file" class="input-field" accept="image/*" onchange="analizarComprobante(this)">
                 </div>
                 
                 <h4>Productos Seleccionados:</h4>
@@ -376,7 +379,7 @@
         <div style="background: white; padding: 40px; border-radius: 15px; text-align: center; max-width: 90%; width: 450px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); animation: popIn 0.5s ease-out;">
             <div style="font-size: 70px; margin-bottom: 10px;">🎉</div>
             <h2 style="color: var(--success); margin-top: 0; font-size: 28px;">¡COMPRA REALIZADA!</h2>
-            <p style="font-size: 16px; color: #555; line-height: 1.5;">Tu pedido ha sido procesado con éxito y nuestro equipo ya lo recibió. Nos pondremos en contacto contigo pronto.</p>
+            <p style="font-size: 16px; color: #555; line-height: 1.5;">¡Tu pedido ha sido procesado con éxito y en minutos estará en casa!</p>
             <button class="btn btn-primary" style="margin-top: 20px; font-size: 16px; padding: 10px 30px;" onclick="document.getElementById('modal-compra-exitosa').style.display='none'">Aceptar y Volver a la Tienda</button>
         </div>
         <style>@keyframes popIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }</style>
@@ -901,6 +904,12 @@
                 }
 
                 // --- LÓGICA DE VISIBILIDAD DE PESTAÑAS Y PROTECCIÓN ---
+                
+                // Convertimos la tarjeta derecha en un contenedor Flex para poder reordenar sus elementos
+                const cardCaja = document.getElementById('btn-procesar-factura').parentElement;
+                cardCaja.style.display = 'flex';
+                cardCaja.style.flexDirection = 'column';
+
                 if(rolActivo === 'vendedor') {
                     document.getElementById('nav-config').style.display = 'none';
                     document.getElementById('nav-facturas').style.display = 'block';
@@ -909,18 +918,29 @@
                     document.getElementById('nav-perfil').style.display = 'none';
                     if(document.getElementById('nav-reportes')) document.getElementById('nav-reportes').style.display = 'none';
                     
+                    if(document.getElementById('btn-pago-bdv')) document.getElementById('btn-pago-bdv').style.display = 'none';
                     document.getElementById('bloque-condiciones-pago').style.display = 'block';
                     document.getElementById('caja-descuento-row').style.display = 'flex';
                     document.getElementById('caja-cliente').readOnly = false;
                     document.getElementById('caja-cliente').nextElementSibling.style.display = 'block';
-                    document.getElementById('barcode-scanner-horizontal').style.display = 'flex'; // Muestra Lector
+                    document.getElementById('barcode-scanner-horizontal').style.display = 'flex';
                     document.getElementById('btn-procesar-factura').innerText = 'GENERAR & IMPRIMIR NOTA';
                     document.getElementById('btn-procesar-factura').classList.remove('btn-animado-compra');
+                    
+                    // Restaurar orden visual clásico para Vendedores
+                    document.getElementById('bloque-condiciones-pago').style.order = "";
+                    document.getElementById('caja-items-seleccionados').previousElementSibling.style.order = "";
+                    document.getElementById('caja-items-seleccionados').previousElementSibling.style.marginTop = "";
+                    document.getElementById('caja-items-seleccionados').style.order = "";
+                    document.getElementById('totals-breakdown-box').style.order = "";
+                    document.getElementById('totals-breakdown-box').style.marginBottom = "";
+                    document.getElementById('wrapper-valores-contado').style.order = "";
+                    document.getElementById('btn-procesar-factura').style.order = "";
                     
                     switchTab('tab-caja');
 
                 } else if (rolActivo === 'cliente') {
-                    // 1. Mostrar SOLO Caja y Perfil en el menú desplegable
+                    // Mostrar SOLO Caja y Perfil
                     document.getElementById('nav-config').style.display = 'none';
                     document.getElementById('nav-facturas').style.display = 'none';
                     document.getElementById('nav-personal').style.display = 'none';
@@ -928,13 +948,14 @@
                     if(document.getElementById('nav-reportes')) document.getElementById('nav-reportes').style.display = 'none';
                     document.getElementById('nav-perfil').style.display = 'block';
                     
-                    // 2. Ocultar el pago en efectivo y la barra roja de descuentos
+                    // Mostrar el Botón Pago Móvil BDV solo al cliente
+                    if(document.getElementById('btn-pago-bdv')) document.getElementById('btn-pago-bdv').style.display = 'block';
+                    
                     document.getElementById('bloque-condiciones-pago').style.display = 'none';
                     document.getElementById('caja-descuento-row').style.display = 'none';
                     document.getElementById('caja-condicion-pago').value = 'contado-sin-desc'; 
                     toggleCamposCajaCondicion();
 
-                    // 3. Rellenar automáticamente los datos del cliente
                     if (userObj.perfil) {
                         document.getElementById('perf-nombre').value = userObj.perfil.nombre || "";
                         document.getElementById('perf-cedula').value = userObj.perfil.cedula || "";
@@ -948,19 +969,32 @@
                         document.getElementById('caja-cliente').value = userObj.nombre || "Consumidor Final";
                     }
                     
-                    // Bloquear edición nombre, esconder botón "Validar" y OCULTAR LECTOR DE BARRAS
                     document.getElementById('caja-cliente').readOnly = true;
                     document.getElementById('caja-cliente').nextElementSibling.style.display = 'none';
-                    document.getElementById('barcode-scanner-horizontal').style.display = 'none'; // Oculta Lector
-                    document.getElementById('btn-procesar-factura').innerText = '🛒 COMPRAR AHORA';
+                    document.getElementById('barcode-scanner-horizontal').style.display = 'none';
+                    document.getElementById('btn-procesar-factura').innerText = '🛒 ENVIAR PEDIDO';
                     document.getElementById('btn-procesar-factura').classList.add('btn-animado-compra');
 
-                    // Esconder botón cancelar
+                    // --- REORDENAMIENTO VISUAL E-COMMERCE (SOLO PARA CLIENTE) ---
+                    document.getElementById('bloque-condiciones-pago').style.order = "4";
+                    document.getElementById('caja-items-seleccionados').previousElementSibling.style.order = "5"; // Título: Productos Seleccionados
+                    document.getElementById('caja-items-seleccionados').previousElementSibling.style.marginTop = "0px";
+                    document.getElementById('caja-items-seleccionados').style.order = "6"; // Lista de Productos
+                    document.getElementById('totals-breakdown-box').style.order = "7"; // Totales
+                    document.getElementById('totals-breakdown-box').style.marginBottom = "15px";
+                    
+                    // NUEVO: Movemos el Botón BDV exactamente debajo de los Totales
+                    if(document.getElementById('btn-pago-bdv')) {
+                        document.getElementById('btn-pago-bdv').style.order = "8";
+                    }
+                    
+                    document.getElementById('wrapper-valores-contado').style.order = "9"; // Ref y Adjuntar Comprobante
+                    document.getElementById('btn-procesar-factura').style.order = "10"; // Botón Comprar Ahora
+
                     if(document.getElementById('btn-cancelar-registro')) {
                         document.getElementById('btn-cancelar-registro').style.display = 'none';
                     }
 
-                    // Redirección inteligente al perfil si no ha llenado los datos
                     if (!userObj.perfil || !userObj.perfil.nombre) {
                         switchTab('tab-perfil');
                         setTimeout(() => alert("👋 ¡Bienvenido!\n\nPor favor completa tus datos de contacto para poder enviarte tus compras."), 400);
@@ -969,7 +1003,7 @@
                     }
 
                 } else {
-                    // Administradores y Gerentes: Restablecer todos los controles
+                    // Administradores y Gerentes
                     document.getElementById('nav-config').style.display = 'block';
                     document.getElementById('nav-facturas').style.display = 'block';
                     document.getElementById('nav-personal').style.display = 'block';
@@ -977,14 +1011,25 @@
                     document.getElementById('nav-perfil').style.display = 'none';
                     if(document.getElementById('nav-reportes')) document.getElementById('nav-reportes').style.display = 'block';
                     
+                    if(document.getElementById('btn-pago-bdv')) document.getElementById('btn-pago-bdv').style.display = 'none';
                     document.getElementById('bloque-condiciones-pago').style.display = 'block';
                     document.getElementById('caja-descuento-row').style.display = 'flex';
                     document.getElementById('caja-cliente').readOnly = false;
                     document.getElementById('caja-cliente').nextElementSibling.style.display = 'block';
-                    document.getElementById('barcode-scanner-horizontal').style.display = 'flex'; // Muestra Lector
+                    document.getElementById('barcode-scanner-horizontal').style.display = 'flex';
                     document.getElementById('btn-procesar-factura').innerText = 'GENERAR & IMPRIMIR NOTA';
                     document.getElementById('btn-procesar-factura').classList.remove('btn-animado-compra');
                     
+                    // Restaurar orden visual clásico para Administradores
+                    document.getElementById('bloque-condiciones-pago').style.order = "";
+                    document.getElementById('caja-items-seleccionados').previousElementSibling.style.order = "";
+                    document.getElementById('caja-items-seleccionados').previousElementSibling.style.marginTop = "";
+                    document.getElementById('caja-items-seleccionados').style.order = "";
+                    document.getElementById('totals-breakdown-box').style.order = "";
+                    document.getElementById('totals-breakdown-box').style.marginBottom = "";
+                    document.getElementById('wrapper-valores-contado').style.order = "";
+                    document.getElementById('btn-procesar-factura').style.order = "";
+
                     switchTab('tab-caja');
                 }
                 
@@ -1278,6 +1323,26 @@ window.filtrarAlmacenTabla = function() {
             });
         };
 
+        // --- NUEVO: FUNCIÓN PARA GENERAR LINK BDV DINÁMICO ---
+        window.procesarPagoBDV = function() {
+            if(carrito.length === 0) return alert("El carrito está vacío. Seleccione productos antes de intentar pagar.");
+            
+            // Extraer el total en bolívares de la pantalla
+            const totalBsText = document.getElementById('total-bs').innerText;
+            const totalBs = parseFloat(totalBsText) || 0;
+            
+            if(totalBs <= 0) return alert("El total a pagar es inválido.");
+
+            // Formatear a 2 decimales para el banco
+            const montoPagar = totalBs.toFixed(2);
+            
+            // Armar el link sumándole el monto exacto al final
+            const linkBase = "https://bdvdigital.banvenez.com/pagomovil?id=V19978103&phone=584124645195&bank=0102&description=9dxBliWt4XnVSB0LTqNasQ%3D%3D&amount=";
+            const urlFinal = linkBase + montoPagar;
+            
+            // Abrir el enlace en una nueva pestaña (O forzar apertura de la app en móviles)
+            window.open(urlFinal, '_blank');
+        };
         window.toggleCamposCajaCondicion = function() {
     const cond = document.getElementById('caja-condicion-pago').value;
     const isEfectivo = document.getElementById('caja-check-efectivo').checked;
@@ -2277,6 +2342,47 @@ if(!isEfectivo && referencia !== "Ninguna" && esReferenciaInvalidaODuplicada(ref
                 else if(configCache.logo) configData.logo = configCache.logo;
 
                 set(ref(db, 'configuracion'), configData).then(() => alert("Parámetros guardados con éxito."));
+            });
+        };
+        // --- MOTOR DE ANÁLISIS AUTOMÁTICO DE COMPROBANTES ---
+        window.analizarComprobante = async function(fileInput) {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const statusLabel = document.getElementById('caja-comprobante-opcional');
+            statusLabel.innerText = "🔍 Analizando imagen...";
+            
+            Tesseract.recognize(file, 'spa').then(({ data: { text } }) => {
+                // MEJORA: Regex más flexible. 
+                // Busca palabras clave + números de 8 a 13 dígitos.
+                // Ignora espacios internos si los hubiera.
+                const regex = /(?:referencia|ref|operacion|operación|nro|recibo|nº|#|num)\D{0,10}(\d{8,13})/gi;
+                let match = regex.exec(text.toLowerCase());
+                
+                if (match && match[1]) {
+                    const refCompleta = match[1];
+                    const ultimos5 = refCompleta.slice(-5); // Extraemos los últimos 5 dígitos para tu sistema
+                    
+                    document.getElementById('caja-referencia').value = ultimos5;
+                    statusLabel.innerText = "✅ Detectada: " + refCompleta + " (Usando " + ultimos5 + ")";
+                    statusLabel.style.color = "var(--success)";
+                } else {
+                    // Si no encuentra el patrón, intenta buscar solo el número más largo de toda la imagen
+                    const numerosLargos = text.match(/\d{8,13}/g);
+                    if (numerosLargos) {
+                        const refCompleta = numerosLargos.sort((a, b) => b.length - a.length)[0];
+                        const ultimos5 = refCompleta.slice(-5);
+                        document.getElementById('caja-referencia').value = ultimos5;
+                        statusLabel.innerText = "✅ Detectada: " + refCompleta;
+                        statusLabel.style.color = "var(--success)";
+                    } else {
+                        statusLabel.innerText = "⚠️ No detectada, ingrésela manualmente.";
+                        statusLabel.style.color = "var(--danger)";
+                    }
+                }
+            }).catch(err => {
+                statusLabel.innerText = "❌ Error al analizar.";
+                console.error(err);
             });
         };
 
