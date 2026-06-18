@@ -1429,8 +1429,15 @@ window.filtrarAlmacenTabla = function() {
             const linkBase = "https://bdvdigital.banvenez.com/pagomovil?id=V19978103&phone=584124645195&bank=0102&description=9dxBliWt4XnVSB0LTqNasQ%3D%3D&amount=";
             const urlFinal = linkBase + montoPagar;
             
-            // Abrir el enlace en una nueva pestaña (O forzar apertura de la app en móviles)
-            window.open(urlFinal, '_blank');
+            // --- NUEVO: LÓGICA ESPECIAL PARA MEDIAN.CO ---
+            // Detecta si el cliente está usando la App descargada de Median/GoNative
+            if (navigator.userAgent.toLowerCase().indexOf('median') > -1 || navigator.userAgent.toLowerCase().indexOf('gonative') > -1 || window.median) {
+                // Envía una orden al sistema operativo para que abra la app del Banco de Venezuela de forma externa
+                window.location.href = 'median://open/external?url=' + encodeURIComponent(urlFinal);
+            } else {
+                // Si el cliente está comprando desde Google Chrome o Safari normal
+                window.open(urlFinal, '_blank');
+            }
         };
         window.toggleCamposCajaCondicion = function() {
     const cond = document.getElementById('caja-condicion-pago').value;
