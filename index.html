@@ -1412,7 +1412,6 @@ window.filtrarAlmacenTabla = function() {
             });
         };
 
-        // --- NUEVO: FUNCIÓN PARA GENERAR LINK BDV DINÁMICO ---
         // --- FUNCIÓN PARA GENERAR LINK BDV DINÁMICO ---
         window.procesarPagoBDV = function() {
             if(carrito.length === 0) return alert("El carrito está vacío. Seleccione productos antes de intentar pagar.");
@@ -1426,13 +1425,23 @@ window.filtrarAlmacenTabla = function() {
             // Formatear a 2 decimales para el banco
             const montoPagar = totalBs.toFixed(2);
             
-            // Armar el link sumándole el monto exacto al final
             const linkBase = "https://bdvdigital.banvenez.com/pagomovil?id=V19978103&phone=584124645195&bank=0102&description=9dxBliWt4XnVSB0LTqNasQ%3D%3D&amount=";
             const urlFinal = linkBase + montoPagar;
             
-            // Median interceptará este 'window.open', verá la regla "External" que creamos
-            // y abrirá la app del Banco de Venezuela dejando tu tienda intacta de fondo.
-            window.open(urlFinal, '_blank');
+            // Detectamos si es un dispositivo Android para forzar el escape del WebView
+            if (/android/i.test(navigator.userAgent)) {
+                // El protocolo "intent://" obliga al sistema operativo a abrir una tarea completamente nueva (App externa)
+                const intentUrl = "intent://bdvdigital.banvenez.com/pagomovil?id=V19978103&phone=584124645195&bank=0102&description=9dxBliWt4XnVSB0LTqNasQ%3D%3D&amount=" + montoPagar + "#Intent;scheme=https;end";
+                window.location.href = intentUrl;
+            } else {
+                // Para iPhone (iOS) o PC, creamos un enlace invisible que burla los bloqueos
+                const a = document.createElement('a');
+                a.href = urlFinal;
+                a.target = '_blank';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
         };
         window.toggleCamposCajaCondicion = function() {
     const cond = document.getElementById('caja-condicion-pago').value;
