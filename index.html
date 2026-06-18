@@ -217,6 +217,10 @@
             🔔 PEDIDOS PENDIENTES (<span id="badge-pedidos-count">0</span>)
         </button>
 
+        <button id="btn-usuarios-online" class="btn" style="border-radius: 20px; font-weight: bold; font-size: 13px; padding: 5px 15px; margin: 0 10px; background: #0dcaf0; color: #000; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);" onclick="document.getElementById('modal-usuarios-online').style.display='flex'">
+            🟢 EN LÍNEA: <span id="badge-online-count">0</span>
+        </button>
+
         <button class="menu-toggle" onclick="toggleMenu()">☰</button>
 
         <div class="nav-content" id="menu-desplegable">
@@ -290,9 +294,19 @@
                 </div>
 
 <div id="wrapper-valores-contado">
-    <div id="bloque-referencia">
-        <label>Número de Referencia de Pago (5 dígitos):</label>
-        <input type="text" id="caja-referencia" class="input-field" placeholder="Ej: 12345" maxlength="5" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+    <div id="bloque-referencia" style="margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label style="margin: 0;">Referencia de Pago (5 dígitos):</label>
+            <span id="caja-comprobante-opcional" style="color:#666; font-size:12px; font-weight:bold;">(Opcional)</span>
+        </div>
+        <div style="display: flex; align-items: center; background: white; border: 1px solid #ccc; border-radius: 4px; padding-right: 5px;">
+            <input type="text" id="caja-referencia" class="input-field" placeholder="Ej: 12345" maxlength="5" oninput="this.value = this.value.replace(/[^0-9]/g, '')" style="border: none; margin: 0; flex-grow: 1; outline: none; box-shadow: none; padding: 10px;">
+            
+            <label for="caja-comprobante-file" style="cursor: pointer; background: #006bb3; color: white; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; margin: 0; white-space: nowrap; transition: 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+                📸 Adjuntar
+            </label>
+            <input type="file" id="caja-comprobante-file" accept="image/*" onchange="analizarComprobante(this)" style="display: none;">
+        </div>
     </div>
 
     <div id="bloque-efectivo" style="display: none; background: #eef2f5; padding: 12px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #ccc;">
@@ -315,8 +329,7 @@
         <input type="number" id="caja-monto-abono-bs" step="0.01" class="input-field" placeholder="Monto total liquidado en bolívares">
     </div>
 
-                    <label>Adjuntar Comprobante (Imagen) <span id="caja-comprobante-opcional" style="color:#666; font-size:12px;">(Opcional)</span>:</label>
-                    <input type="file" id="caja-comprobante-file" class="input-field" accept="image/*" onchange="analizarComprobante(this)">
+                    
                 </div>
                 
                 <h4>Productos Seleccionados:</h4>
@@ -364,6 +377,10 @@
             <label>Dirección (Con exactitud):</label>
             <textarea id="perf-dir" class="input-field" rows="2" placeholder="Av. Principal, Edificio..."></textarea>
             
+            <button id="btn-gps" class="btn" style="background: #17a2b8; color: white; margin-bottom: 15px; width: 100%; font-size: 14px; border: 2px solid #138496; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" onclick="obtenerUbicacionGPS()" type="button">📍 INGRESAR DIRECCIÓN EXACTA DESDE EL GPS</button>
+            <input type="hidden" id="perf-lat">
+            <input type="hidden" id="perf-lng">
+            
             <label style="color: var(--danger); font-weight: bold; margin-top: 10px; display: block;">Crea una Contraseña de Acceso:</label>
             <input type="text" id="perf-pass" class="input-field" placeholder="Escribe aquí tu clave para iniciar sesión luego">
             
@@ -388,8 +405,11 @@
         <div class="card" style="max-width: 650px; margin: auto;">
             <h3>Configuración de Datos de la Empresa</h3>
             <div style="background: #eef2f5; padding: 12px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid var(--primary);">
-                <label style="cursor: pointer; font-weight: bold; margin: 0; display: flex; align-items: center; gap: 10px; color: #333;">
+                <label style="cursor: pointer; font-weight: bold; margin: 0; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; color: #333;">
                     <input type="checkbox" id="conf-iva" style="transform: scale(1.3);"> Activar Sistema de Impuesto (Aplica IVA 16% en Caja)
+                </label>
+                <label style="cursor: pointer; font-weight: bold; margin: 0; display: flex; align-items: center; gap: 10px; color: #333;">
+                    <input type="checkbox" id="conf-comisiones" style="transform: scale(1.3);"> Activar Comisiones para Vendedores
                 </label>
             </div>
             <label>Nombre de la Empresa:</label>
@@ -733,12 +753,23 @@
             <h3 style="margin-top:0; color:var(--danger); border-bottom: 2px solid #eee; padding-bottom: 10px;">🚨 Envíos Pendientes por Despachar</h3>
             <p style="font-size:13px; color:#555;">Lista de compras online realizadas por los clientes que requieren despacho inmediato.</p>
             <div id="lista-modal-pedidos">
+                    </div>
+            </div>
+        </div>    
+
+    <div id="modal-usuarios-online" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index: 10000; align-items:center; justify-content:center;">
+        <div style="background:white; padding:25px; border-radius:8px; width:450px; max-width:90%; position:relative;">
+            <button onclick="document.getElementById('modal-usuarios-online').style.display='none'" style="position:absolute; right:15px; top:15px; background:var(--danger); color:white; border:none; border-radius:4px; padding:5px 10px; cursor:pointer; font-weight:bold;">✖ Cerrar</button>
+            <h3 style="margin-top:0; color:#0f172a; border-bottom: 2px solid #eee; padding-bottom: 10px;">🟢 Usuarios Conectados Ahora</h3>
+            <p style="font-size:13px; color:#555;">Personas que están navegando en el sistema en tiempo real.</p>
+            <div id="lista-usuarios-online" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
                 </div>
         </div>
-    </div>    
+    </div>
+
 <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getDatabase, ref, set, push, onValue, get, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+        import { getDatabase, ref, set, push, onValue, get, remove, runTransaction, onDisconnect } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCgFJVToluiG3I-Lxml6cXmP-f2pMb0rxg",
@@ -831,12 +862,23 @@
                     const u = personalCache[key];
                     selectLogin.innerHTML += `<option value="${key}">${u.nombre} (${u.rol.toUpperCase()})</option>`;
                 }
+
+                // NUEVO: Auto-seleccionar y rellenar clave del último usuario registrado o logueado
+                const lastKey = localStorage.getItem('lastUserKey');
+                const lastPass = localStorage.getItem('lastUserPass');
+                if (lastKey && personalCache[lastKey]) {
+                    selectLogin.value = lastKey;
+                    if (lastPass) {
+                        document.getElementById('login-pass').value = lastPass;
+                    }
+                }
             });
 
             // Parámetros de empresa
             onValue(ref(db, 'configuracion'), (snapshot) => {
                 configCache = snapshot.val() || {};
                 if(document.getElementById('conf-iva')) document.getElementById('conf-iva').checked = configCache.ivaActivo || false;
+                if(document.getElementById('conf-comisiones')) document.getElementById('conf-comisiones').checked = configCache.comisionesActivas || false;
                 document.getElementById('conf-nombre').value = configCache.nombre || '';
                 document.getElementById('conf-rif').value = configCache.rif || '';
                 document.getElementById('conf-direccion').value = configCache.direccion || '';
@@ -866,6 +908,30 @@
                 clientesCache = snapshot.val() || {};
                 if(typeof renderizarTablaClientes === 'function') renderizarTablaClientes();
             });
+
+            // NUEVO: Escuchar Usuarios en Línea
+            onValue(ref(db, 'presencia'), (snapshot) => {
+                const conectados = snapshot.val() || {};
+                let count = 0;
+                let html = '';
+                for(let key in conectados) {
+                    count++;
+                    let rolDisplay = conectados[key].rol.toUpperCase();
+                    let colorBadge = conectados[key].rol === 'cliente' ? 'var(--success)' : 'var(--primary)';
+                    html += `
+                        <div style="background:#f8f9fa; padding:10px; border-radius:6px; border:1px solid #ddd; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-weight:bold; color:#333;">👤 ${conectados[key].nombre}</span>
+                            <span style="background:${colorBadge}; color:white; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:bold;">${rolDisplay}</span>
+                        </div>
+                    `;
+                }
+                const badgeCount = document.getElementById('badge-online-count');
+                const listOnline = document.getElementById('lista-usuarios-online');
+                if(badgeCount) badgeCount.innerText = count;
+                if(listOnline) {
+                    listOnline.innerHTML = count > 0 ? html : '<p style="text-align:center; color:#666; padding: 20px;">Nadie en línea</p>';
+                }
+            });
         }
 
         // --- SISTEMA DE AUTENTICACIÓN AVANZADO ---
@@ -886,9 +952,26 @@
                 usuarioKeyActivo = keySelected; // Guarda el ID interno del usuario
                 rolActivo = userObj.rol;
 
+                // NUEVO: Guardar credenciales en el navegador para la próxima vez
+                localStorage.setItem('lastUserKey', keySelected);
+                localStorage.setItem('lastUserPass', passInput);
+
                 document.getElementById('login-overlay').style.display = 'none';
                 document.getElementById('login-pass').value = '';
                 document.getElementById('display-user-nav').innerText = `👤 ${usuarioActivo} [${rolActivo.toUpperCase()}]`;
+
+                // --- NUEVO: SISTEMA AUTOMÁTICO DE PRESENCIA (EN LÍNEA) ---
+                const connectedRef = ref(db, ".info/connected");
+                onValue(connectedRef, (snap) => {
+                    if (snap.val() === true && usuarioKeyActivo) {
+                        const miPresenciaRef = ref(db, `presencia/${usuarioKeyActivo}`);
+                        // Si el usuario cierra el navegador, pierde WiFi, etc., Firebase lo borra de la lista
+                        onDisconnect(miPresenciaRef).remove().then(() => {
+                            // Si se conectó bien, lo añade a la lista
+                            set(miPresenciaRef, { nombre: usuarioActivo, rol: rolActivo, timestamp: Date.now() });
+                        });
+                    }
+                });
 
                 renderizarFacturasHistorico();
 
@@ -1039,8 +1122,14 @@
         };
 
         window.cerrarSesion = function() {
+            // Borrar presencia de la base de datos al salir manualmente
+            if (usuarioKeyActivo) {
+                remove(ref(db, `presencia/${usuarioKeyActivo}`));
+            }
+            
             document.getElementById('login-overlay').style.display = 'flex';
             usuarioActivo = null;
+            usuarioKeyActivo = null;
             rolActivo = null;
             
             // Limpiar la vista de facturas al salir para proteger datos
@@ -1598,6 +1687,41 @@ window.calcularCambioEfectivo = function() {
             document.getElementById('login-overlay').style.display = 'flex';
         };
 
+        // --- NUEVO: FUNCIÓN SATELITAL DE GEOLOCALIZACIÓN ---
+        window.obtenerUbicacionGPS = function() {
+            const btn = document.getElementById('btn-gps');
+            btn.innerText = "⏳ Conectando con el satélite...";
+            btn.style.background = "#ffc107";
+            btn.style.borderColor = "#d39e00";
+            
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    
+                    // Guardamos las coordenadas en los campos ocultos
+                    document.getElementById('perf-lat').value = lat;
+                    document.getElementById('perf-lng').value = lng;
+                    
+                    // Añadimos una marca de confirmación visual en el texto de la dirección
+                    const textDir = document.getElementById('perf-dir').value;
+                    if(!textDir.includes("Ubicación GPS fijada")) {
+                        document.getElementById('perf-dir').value = textDir + (textDir ? " - " : "") + "📍 Ubicación GPS fijada exitosamente.";
+                    }
+                    
+                    btn.innerText = "✅ UBICACIÓN GPS GUARDADA CON ÉXITO";
+                    btn.style.background = "var(--success)";
+                    btn.style.borderColor = "#1e7e34";
+                }, function(error) {
+                    btn.innerText = "❌ ERROR: ENCIENDA SU GPS Y DELE PERMISOS AL NAVEGADOR";
+                    btn.style.background = "var(--danger)";
+                    alert("No pudimos rastrear su ubicación. Por favor, asegúrese de tener encendida la Ubicación (GPS) de su teléfono y de permitirle el acceso al navegador.");
+                }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+            } else {
+                alert("Su navegador no soporta tecnología de geolocalización.");
+            }
+        };
+
         window.guardarPerfilCliente = function() {
             const nombre = document.getElementById('perf-nombre').value.trim();
             const cedula = document.getElementById('perf-cedula').value.trim();
@@ -1608,8 +1732,11 @@ window.calcularCambioEfectivo = function() {
             if(!nombre || !cedula) return alert("El nombre y la cédula son obligatorios.");
             if(!password) return alert("Debe crear una contraseña para su cuenta.");
 
-            const perfilData = { nombre, cedula, telefono, direccion };
-            const cliData = { cedula, nombre, telefono, direccion };
+            const latitud = document.getElementById('perf-lat').value || null;
+            const longitud = document.getElementById('perf-lng').value || null;
+
+            const perfilData = { nombre, cedula, telefono, direccion, latitud, longitud };
+            const cliData = { cedula, nombre, telefono, direccion, latitud, longitud };
 
             // Si es un REGISTRO NUEVO
             if (!usuarioKeyActivo) {
@@ -1638,17 +1765,17 @@ window.calcularCambioEfectivo = function() {
                         document.querySelector('.navbar').style.display = 'flex';
                         document.getElementById('login-overlay').style.display = 'flex';
                         
-                        // Autoselecciona su nombre de la lista en medio segundo
+                        // Autoselecciona su nombre y prepara la contraseña
                         setTimeout(() => {
                             const selectLogin = document.getElementById('login-user-select');
-                            if(selectLogin) {
-                                for(let i=0; i<selectLogin.options.length; i++) {
-                                    if(selectLogin.options[i].value === newKey) {
-                                        selectLogin.selectedIndex = i;
-                                        break;
-                                    }
-                                }
-                            }
+                            if(selectLogin) selectLogin.value = newKey;
+                            
+                            // Ponemos la contraseña de una vez para que solo le dé a "Ingresar"
+                            document.getElementById('login-pass').value = password;
+                            
+                            // Guardamos en memoria por si recarga la página
+                            localStorage.setItem('lastUserKey', newKey);
+                            localStorage.setItem('lastUserPass', password);
                         }, 500);
                     });
                 });
@@ -1737,18 +1864,22 @@ if(!isEfectivo && referencia !== "Ninguna" && esReferenciaInvalidaODuplicada(ref
             encodeImageToBase64(fileInput, (base64Img) => {
                 const timestamp = new Date().toLocaleString('es-VE');
 
-                // 🌟 Extraer Teléfono y Dirección siempre (Sea el Cliente o el Vendedor)
+                // 🌟 Extraer Teléfono, Dirección y GPS siempre (Sea el Cliente o el Vendedor)
                 let dirCliente = "";
                 let telCliente = "";
+                let latCliente = null;
+                let lngCliente = null;
                 
                 if(rolActivo === 'cliente' && personalCache[usuarioKeyActivo] && personalCache[usuarioKeyActivo].perfil) {
-                    // Si el cliente está comprando él mismo desde su perfil
                     dirCliente = personalCache[usuarioKeyActivo].perfil.direccion || "";
                     telCliente = personalCache[usuarioKeyActivo].perfil.telefono || "";
+                    latCliente = personalCache[usuarioKeyActivo].perfil.latitud || null;
+                    lngCliente = personalCache[usuarioKeyActivo].perfil.longitud || null;
                 } else if (cedulaCliente && clientesCache[cedulaCliente]) {
-                    // Si el vendedor le está facturando a un cliente ya registrado
                     dirCliente = clientesCache[cedulaCliente].direccion || "";
                     telCliente = clientesCache[cedulaCliente].telefono || "";
+                    latCliente = clientesCache[cedulaCliente].latitud || null;
+                    lngCliente = clientesCache[cedulaCliente].longitud || null;
                 }
 
                 runTransaction(ref(db, 'contadorNotas'), (current) => {
@@ -1763,6 +1894,8 @@ if(!isEfectivo && referencia !== "Ninguna" && esReferenciaInvalidaODuplicada(ref
                         cedulaCliente,
                         direccionCliente: dirCliente,
                         telefonoCliente: telCliente,
+                        latitudCliente: latCliente,
+                        longitudCliente: lngCliente,
                         condicion,
                         referencia: referencia,
                         fecha: timestamp,
@@ -1885,7 +2018,9 @@ if(!isEfectivo && referencia !== "Ninguna" && esReferenciaInvalidaODuplicada(ref
             let countPendientes = 0;
             let listaPendientesHTML = "";
 
-            for(let key in facturasCache) {
+            // EXTRAEMOS LAS LLAVES, LAS VOLTEAMOS (REVERSE) Y LUEGO RECORREMOS LA LISTA
+            const facturasInvertidas = Object.keys(facturasCache).reverse();
+            for(let key of facturasInvertidas) {
                 const f = facturasCache[key];
                 
                 if(rolActivo === 'vendedor' && f.vendedor !== usuarioActivo) continue;
@@ -1901,7 +2036,7 @@ if(!isEfectivo && referencia !== "Ninguna" && esReferenciaInvalidaODuplicada(ref
                 let estaPagada = saldoRestanteUsd <= 0.05; 
 
                 let badgeComision = "";
-                if(estaPagada) {
+                if(estaPagada && configCache.comisionesActivas) {
                     let comision = f.totalUsd * PORCENTAJE_COMISION;
                     totalComisionesGeneradas += comision;
                     badgeComision = `<br><span style="color:var(--success); font-weight:bold; font-size:12px;">💰 Comisión: $${comision.toFixed(2)}</span>`;
@@ -1964,10 +2099,14 @@ if(!isEfectivo && referencia !== "Ninguna" && esReferenciaInvalidaODuplicada(ref
             }
 
             if(document.getElementById('panel-comisiones')) {
-                document.getElementById('panel-comisiones').style.display = 'block';
-                document.getElementById('comision-porcentaje-display').innerText = (PORCENTAJE_COMISION * 100).toFixed(0);
-                document.getElementById('total-comisiones-usd').innerText = `$${totalComisionesGeneradas.toFixed(2)}`;
-                document.getElementById('total-comisiones-bs').innerText = `${(totalComisionesGeneradas * tasaBcv).toFixed(2)} Bs`;
+                if (configCache.comisionesActivas) {
+                    document.getElementById('panel-comisiones').style.display = 'block';
+                    document.getElementById('comision-porcentaje-display').innerText = (PORCENTAJE_COMISION * 100).toFixed(0);
+                    document.getElementById('total-comisiones-usd').innerText = `$${totalComisionesGeneradas.toFixed(2)}`;
+                    document.getElementById('total-comisiones-bs').innerText = `${(totalComisionesGeneradas * tasaBcv).toFixed(2)} Bs`;
+                } else {
+                    document.getElementById('panel-comisiones').style.display = 'none';
+                }
             }
 
             // ACTUALIZAR NOTIFICACIÓN EN LA BARRA SUPERIOR
@@ -2013,9 +2152,27 @@ if(!isEfectivo && referencia !== "Ninguna" && esReferenciaInvalidaODuplicada(ref
             detalleCard.style.display = 'flex';
 
             let itemsList = "";
-            f.items.forEach(i => itemsList += `<li>${i.cantidad}x ${i.nombre} - $${i.precio.toFixed(2)}</li>`);
+            f.items.forEach(i => {
+                let subtotalArticulo = i.precio * i.cantidad;
+                itemsList += `<li style="margin-bottom: 5px;">${i.cantidad}x ${i.nombre} - <b style="color: var(--success);">$${subtotalArticulo.toFixed(2)}</b> <span style="color: #666; font-size: 12px;">(P. Unitario: $${i.precio.toFixed(2)})</span></li>`;
+            });
 
             const totalFacturaBsDinamico = f.totalUsd * tasaBcv;
+
+            // --- NUEVO: CREAR MAPA DE GOOGLE SI HAY GPS ---
+            let mapaGPSHTML = "";
+            if (f.latitudCliente && f.longitudCliente) {
+                const mapUrl = `https://maps.google.com/maps?q=${f.latitudCliente},${f.longitudCliente}&hl=es&z=17&output=embed`;
+                mapaGPSHTML = `
+                    <div style="margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 15px;">
+                        <b style="color: var(--danger); font-size: 15px;">📍 UBICACIÓN EXACTA DEL CLIENTE (GPS):</b>
+                        <div style="margin-top: 8px; border-radius: 8px; overflow: hidden; border: 2px solid #ddd; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                            <iframe width="100%" height="250" frameborder="0" style="border:0" src="${mapUrl}" allowfullscreen></iframe>
+                        </div>
+                        <a href="https://www.google.com/maps?q=${f.latitudCliente},${f.longitudCliente}" target="_blank" class="btn" style="background: #17a2b8; color: white; display: block; text-align: center; font-size: 14px; margin-top: 8px; padding: 8px; text-decoration: none; font-weight: bold;">🗺️ Abrir Navegación en Google Maps / Waze</a>
+                    </div>
+                `;
+            }
 
             document.getElementById('detalle-contenido').innerHTML = `
                 <div style="background: #eef2f5; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
@@ -2026,8 +2183,9 @@ if(!isEfectivo && referencia !== "Ninguna" && esReferenciaInvalidaODuplicada(ref
                         <div><b>Nombre:</b><br>${f.cliente}</div>
                         <div><b>Cédula/ID:</b><br>${f.cedulaCliente || 'No registrada'}</div>
                         <div><b>Teléfono:</b><br>${f.telefonoCliente || 'No registrado'}</div>
-                        <div><b>Dirección de entrega:</b><br>${f.direccionCliente || 'No registrada'}</div>
+                        <div style="grid-column: 1 / -1;"><b>Dirección Textual:</b><br>${f.direccionCliente || 'No registrada'}</div>
                     </div>
+                    ${mapaGPSHTML}
                 </div>
                 
                 <div style="background: #fdfdfd; padding: 10px; border: 1px solid #eee; border-radius: 6px; margin-bottom: 15px;">
@@ -2058,18 +2216,22 @@ if(!isEfectivo && referencia !== "Ninguna" && esReferenciaInvalidaODuplicada(ref
 
             // Lógica de la comisión dentro del detalle
             const comisionBox = document.getElementById('status-comision-factura');
-            if(saldoRestanteUsd <= 0.05) {
-                let comision = f.totalUsd * PORCENTAJE_COMISION;
-                comisionBox.innerHTML = `
-                    <div style="background: #d4edda; padding: 10px; border-radius: 4px; border: 1px solid #c3e6cb; margin-bottom: 15px;">
-                        <strong style="color: #155724;">✅ Nota Totalmente Pagada</strong><br>
-                        <span style="color: #155724;">Comisión Generada para <b>${f.vendedor}</b> (${(PORCENTAJE_COMISION*100).toFixed(0)}%): <b>$${comision.toFixed(2)}</b> | <b>${(comision * tasaBcv).toFixed(2)} Bs</b></span>
-                    </div>`;
+            if(configCache.comisionesActivas) {
+                if(saldoRestanteUsd <= 0.05) {
+                    let comision = f.totalUsd * PORCENTAJE_COMISION;
+                    comisionBox.innerHTML = `
+                        <div style="background: #d4edda; padding: 10px; border-radius: 4px; border: 1px solid #c3e6cb; margin-bottom: 15px;">
+                            <strong style="color: #155724;">✅ Nota Totalmente Pagada</strong><br>
+                            <span style="color: #155724;">Comisión Generada para <b>${f.vendedor}</b> (${(PORCENTAJE_COMISION*100).toFixed(0)}%): <b>$${comision.toFixed(2)}</b> | <b>${(comision * tasaBcv).toFixed(2)} Bs</b></span>
+                        </div>`;
+                } else {
+                    comisionBox.innerHTML = `
+                        <div style="background: #e2e3e5; padding: 10px; border-radius: 4px; color: #383d41; margin-bottom: 15px; font-size: 13px; border: 1px solid #d6d8db;">
+                            ⏳ La comisión de esta nota se liberará automáticamente cuando el saldo restante sea $0.00.
+                        </div>`;
+                }
             } else {
-                comisionBox.innerHTML = `
-                    <div style="background: #e2e3e5; padding: 10px; border-radius: 4px; color: #383d41; margin-bottom: 15px; font-size: 13px; border: 1px solid #d6d8db;">
-                        ⏳ La comisión de esta nota se liberará automáticamente cuando el saldo restante sea $0.00.
-                    </div>`;
+                comisionBox.innerHTML = ''; // Oculta el bloque si las comisiones están desactivadas
             }
 
             const compContainer = document.getElementById('lista-comprobantes-adjuntos');
@@ -2334,10 +2496,11 @@ if(!isEfectivo && referencia !== "Ninguna" && esReferenciaInvalidaODuplicada(ref
             const contacto = document.getElementById('conf-contacto').value.trim();
             const banca = document.getElementById('conf-banca').value.trim();
             const ivaActivo = document.getElementById('conf-iva') ? document.getElementById('conf-iva').checked : false;
+            const comisionesActivas = document.getElementById('conf-comisiones') ? document.getElementById('conf-comisiones').checked : false;
             const logoFile = document.getElementById('conf-logo');
 
             encodeImageToBase64(logoFile, (base64) => {
-                const configData = { nombre, rif, direccion, contacto, banca, ivaActivo };
+                const configData = { nombre, rif, direccion, contacto, banca, ivaActivo, comisionesActivas };
                 if(base64) configData.logo = base64;
                 else if(configCache.logo) configData.logo = configCache.logo;
 
@@ -2354,21 +2517,21 @@ if(!isEfectivo && referencia !== "Ninguna" && esReferenciaInvalidaODuplicada(ref
             
             Tesseract.recognize(file, 'spa').then(({ data: { text } }) => {
                 // MEJORA: Regex más flexible. 
-                // Busca palabras clave + números de 8 a 13 dígitos.
-                // Ignora espacios internos si los hubiera.
-                const regex = /(?:referencia|ref|operacion|operación|nro|recibo|nº|#|num)\D{0,10}(\d{8,13})/gi;
+                // // MEJORA: Busca la palabra "referencia" (y derivadas) y lee el código justo a la derecha,
+                // aceptando códigos desde 5 hasta 15 dígitos (incluyendo los de 6 dígitos).
+                const regex = /(?:referencia|ref|operacion|operación|nro|recibo|nº|#|num)\D{0,15}(\d{5,15})/gi;
                 let match = regex.exec(text.toLowerCase());
                 
                 if (match && match[1]) {
                     const refCompleta = match[1];
-                    const ultimos5 = refCompleta.slice(-5); // Extraemos los últimos 5 dígitos para tu sistema
+                    const ultimos5 = refCompleta.slice(-5); // Extraemos los últimos 5 dígitos para la caja
                     
                     document.getElementById('caja-referencia').value = ultimos5;
                     statusLabel.innerText = "✅ Detectada: " + refCompleta + " (Usando " + ultimos5 + ")";
                     statusLabel.style.color = "var(--success)";
                 } else {
-                    // Si no encuentra el patrón, intenta buscar solo el número más largo de toda la imagen
-                    const numerosLargos = text.match(/\d{8,13}/g);
+                    // Si no encuentra el patrón, busca números largos (de 6 a 15 dígitos) libres en la imagen
+                    const numerosLargos = text.match(/\d{6,15}/g);
                     if (numerosLargos) {
                         const refCompleta = numerosLargos.sort((a, b) => b.length - a.length)[0];
                         const ultimos5 = refCompleta.slice(-5);
