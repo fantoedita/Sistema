@@ -1413,6 +1413,7 @@ window.filtrarAlmacenTabla = function() {
         };
 
         // --- NUEVO: FUNCIÓN PARA GENERAR LINK BDV DINÁMICO ---
+        // --- FUNCIÓN PARA GENERAR LINK BDV DINÁMICO ---
         window.procesarPagoBDV = function() {
             if(carrito.length === 0) return alert("El carrito está vacío. Seleccione productos antes de intentar pagar.");
             
@@ -1429,17 +1430,9 @@ window.filtrarAlmacenTabla = function() {
             const linkBase = "https://bdvdigital.banvenez.com/pagomovil?id=V19978103&phone=584124645195&bank=0102&description=9dxBliWt4XnVSB0LTqNasQ%3D%3D&amount=";
             const urlFinal = linkBase + montoPagar;
             
-            // Detecta si la App es de Median/GoNative
-            if (window.median) {
-                // API nativa de Median: Obliga a abrir la app del banco manteniendo la tienda abierta en segundo plano
-                window.median.open.external({ url: urlFinal });
-            } else if (navigator.userAgent.toLowerCase().includes('median') || navigator.userAgent.toLowerCase().includes('gonative')) {
-                // Comando puente alternativo de seguridad
-                window.location.href = 'gonative://open/external?url=' + encodeURIComponent(urlFinal);
-            } else {
-                // Navegadores normales (Chrome, Safari, etc)
-                window.open(urlFinal, '_blank');
-            }
+            // Median interceptará este 'window.open', verá la regla "External" que creamos
+            // y abrirá la app del Banco de Venezuela dejando tu tienda intacta de fondo.
+            window.open(urlFinal, '_blank');
         };
         window.toggleCamposCajaCondicion = function() {
     const cond = document.getElementById('caja-condicion-pago').value;
