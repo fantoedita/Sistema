@@ -1429,12 +1429,15 @@ window.filtrarAlmacenTabla = function() {
             const linkBase = "https://bdvdigital.banvenez.com/pagomovil?id=V19978103&phone=584124645195&bank=0102&description=9dxBliWt4XnVSB0LTqNasQ%3D%3D&amount=";
             const urlFinal = linkBase + montoPagar;
             
-            // Detecta si el cliente está usando la App descargada de Median
-            if (navigator.userAgent.toLowerCase().indexOf('median') > -1 || window.median) {
-                // Redirección directa: Esto obliga a Median a leer la regla "External" que creaste
-                window.location.href = urlFinal; 
+            // Detecta si la App es de Median/GoNative
+            if (window.median) {
+                // API nativa de Median: Obliga a abrir la app del banco manteniendo la tienda abierta en segundo plano
+                window.median.open.external({ url: urlFinal });
+            } else if (navigator.userAgent.toLowerCase().includes('median') || navigator.userAgent.toLowerCase().includes('gonative')) {
+                // Comando puente alternativo de seguridad
+                window.location.href = 'gonative://open/external?url=' + encodeURIComponent(urlFinal);
             } else {
-                // Si el cliente está comprando desde Google Chrome o Safari normal
+                // Navegadores normales (Chrome, Safari, etc)
                 window.open(urlFinal, '_blank');
             }
         };
