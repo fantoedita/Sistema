@@ -1872,6 +1872,21 @@ if(!isEfectivo && referencia !== "Ninguna" && esReferenciaInvalidaODuplicada(ref
     return alert("ERROR: Esta referencia de 5 dígitos ya se encuentra registrada en el sistema.");
 }
 
+            // --- NUEVO: TRANSFORMAR BOTÓN EN BARRA DE CARGA ---
+            const btnProcesar = document.getElementById('btn-procesar-factura');
+            const textoOriginalBtn = btnProcesar.innerHTML; // Guardamos si decía "Enviar" o "Imprimir"
+            
+            btnProcesar.disabled = true;
+            btnProcesar.style.opacity = '0.8';
+            btnProcesar.style.cursor = 'wait';
+            btnProcesar.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    <span>⏳ PROCESANDO TRANSACCIÓN...</span>
+                    <div style="width: 18px; height: 18px; border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spinLoading 1s ease-in-out infinite;"></div>
+                </div>
+                <style>@keyframes spinLoading { to { transform: rotate(360deg); } }</style>
+            `;
+
             encodeImageToBase64(fileInput, (base64Img) => {
                 const timestamp = new Date().toLocaleString('es-VE');
 
@@ -1960,6 +1975,19 @@ if(!isEfectivo && referencia !== "Ninguna" && esReferenciaInvalidaODuplicada(ref
                             imprimirFacturaCarta(nuevaFacturaObj);
                             limpiarCaja();
                         }
+
+                        // --- NUEVO: RESTAURAR EL BOTÓN DESPUÉS DE LA COMPRA ---
+                        btnProcesar.disabled = false;
+                        btnProcesar.style.opacity = '1';
+                        btnProcesar.style.cursor = 'pointer';
+                        btnProcesar.innerHTML = textoOriginalBtn;
+                        
+                    }).catch(error => {
+                        alert("Hubo un problema de red. Intente enviar el pedido nuevamente.");
+                        btnProcesar.disabled = false;
+                        btnProcesar.style.opacity = '1';
+                        btnProcesar.style.cursor = 'pointer';
+                        btnProcesar.innerHTML = textoOriginalBtn;
                     });
                 });
             });
