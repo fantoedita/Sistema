@@ -339,11 +339,11 @@
                 <input type="email" id="perf-email" class="input-field" placeholder="ejemplo@correo.com">
                 
                 <label style="color: var(--danger); font-weight: bold; margin-top: 10px; display: block;">Crea una Contraseña de Acceso:</label>
-                <input type="password" id="perf-pass" class="input-field" placeholder="Mínimo 6 caracteres">
+                <input type="text" id="perf-pass" class="input-field" placeholder="Mínimo 6 caracteres">
             </div>
             
             <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button class="btn btn-success" style="flex: 1;" onclick="guardarPerfilCliente()">💾 Guardar Mis Datos</button>
+                <button id="btn-guardar-perfil" class="btn btn-success" style="flex: 1;" onclick="guardarPerfilCliente()">💾 Guardar Mis Datos</button>
                 <button id="btn-cancelar-registro" class="btn btn-danger" style="flex: 1; display: none;" onclick="cancelarRegistro()">Cancelar</button>
             </div>
         </div>
@@ -857,10 +857,16 @@
             // Todos necesitan leer facturas, pero los clientes solo verán las suyas visualmente
             onValue(ref(db, 'facturas'), (snapshot) => {
                 facturasCache = snapshot.val() || {};
+                
+                // Dispara las notificaciones y el historial visual de inmediato (Velocidad rayo)
                 renderizarFacturasHistorico();
+                
+                // Retrasa 1 segundo el cálculo de estadísticas ocultas para no congelar la pantalla
                 if(rolDelUsuario !== 'cliente') {
-                    if(typeof renderizarTablaClientes === 'function') renderizarTablaClientes();
-                    if(typeof generarReportesVentas === 'function') generarReportesVentas();
+                    setTimeout(() => {
+                        if(typeof renderizarTablaClientes === 'function') renderizarTablaClientes();
+                        if(typeof generarReportesVentas === 'function') generarReportesVentas();
+                    }, 1000);
                 }
             });
 
@@ -1857,30 +1863,43 @@ window.calcularCambioEfectivo = function() {
         window.renderizarFacturasHistorico = function() {
             const container = document.getElementById('lista-facturas-historico');
             if (!container) return;
-            container.innerHTML = '';
+            
+            // Leemos qué está buscando el usuario para filtrar directamente en la memoria
+            const buscadorVal = document.getElementById('factura-buscador') ? document.getElementById('factura-buscador').value.toLowerCase().trim() : '';
+            
             let totalComisionesGeneradas = 0;
-
             let countPendientes = 0;
             let listaPendientesHTML = "";
 
-            // Volteamos para que las más recientes salgan arriba
             const facturasInvertidas = Object.keys(facturasCache).reverse();
+            
+            // 🚀 ESTA ES LA CLAVE: Acumular todo en texto en vez de dibujar en pantalla a cada rato
+            let facturasHTML = ""; 
+            
+            // Límite inteligente: Si no está buscando nada, carga solo las últimas 50 facturas. Si busca algo, permite escanear todo el historial.
+            let limiteRender = buscadorVal === '' ? 50 : 9999; 
+            let mostradas = 0;
+
             for(let key of facturasInvertidas) {
                 const f = facturasCache[key];
                 
-                // Filtro para Vendedores (solo ven las suyas)
                 if(rolActivo === 'vendedor' && f.vendedor !== usuarioActivo) continue;
-                
-                // NUEVO FILTRO: Si es cliente, solo ve las facturas de su propia cédula
-                if(rolActivo === 'cliente') {
-                    if(f.cedulaCliente !== cedulaActiva) continue;
+                if(rolActivo === 'cliente' && f.cedulaCliente !== cedulaActiva) continue;
+
+                // FILTRO DIRECTO DE BÚSQUEDA SÚPER RÁPIDO
+                if (buscadorVal !== '') {
+                    const refSearch = f.referencia ? f.referencia.toLowerCase() : "";
+                    const vendSearch = f.vendedor ? f.vendedor.toLowerCase() : "";
+                    const numSearch = f.numero ? f.numero.toLowerCase() : "";
+                    
+                    if (!numSearch.includes(buscadorVal) && !vendSearch.includes(buscadorVal) && !refSearch.includes(buscadorVal)) {
+                        continue;
+                    }
                 }
 
                 let totalAbonadoUsd = 0;
                 if(f.abonos) {
-                    f.abonos.forEach(ab => {
-                        totalAbonadoUsd += ab.montoUsd || (ab.montoBs / (f.tasa || 1));
-                    });
+                    f.abonos.forEach(ab => { totalAbonadoUsd += ab.montoUsd || (ab.montoBs / (f.tasa || 1)); });
                 }
                 
                 let saldoRestanteUsd = f.totalUsd - totalAbonadoUsd;
@@ -1888,16 +1907,15 @@ window.calcularCambioEfectivo = function() {
 
                 let badgeComision = "";
                 if(estaPagada && configCache.comisionesActivas) {
-                    let comision = f.totalUsd * 0.10; // PORCENTAJE_COMISION
+                    let comision = f.totalUsd * 0.10; 
                     totalComisionesGeneradas += comision;
                     badgeComision = `<br><span style="color:var(--success); font-weight:bold; font-size:12px;">💰 Comisión: $${comision.toFixed(2)}</span>`;
                 }
 
                 const totalBsDinamico = f.totalUsd * tasaBcv;
-
-                // Lógica de Despacho
                 let esPendiente = (f.esPedidoCliente && f.estadoDespacho === 'pendiente');
                 
+                // Los pedidos pendientes siempre se guardan para la campana de alertas
                 if(esPendiente && rolActivo !== 'cliente') {
                     countPendientes++;
                     listaPendientesHTML += `
@@ -1918,7 +1936,6 @@ window.calcularCambioEfectivo = function() {
                 if(esPendiente) {
                     borderColor = 'var(--danger)';
                     bgColor = 'background-color: #ffe6e6;'; 
-                    
                     if(rolActivo !== 'cliente') {
                         btnDespacharHtml = `<div style="margin-top:8px;"><button class="btn btn-danger" style="font-size:11px; padding:5px 10px; animation: pulse-compra 1.5s infinite;" onclick="event.stopPropagation(); marcarComoDespachado('${key}')">🚨 PEDIDO PENDIENTE: DESPACHAR</button></div>`;
                     } else {
@@ -1935,18 +1952,25 @@ window.calcularCambioEfectivo = function() {
                 let marginTopTotal = estaPagada ? '-30px' : '-15px';
                 if(btnDespacharHtml !== '') marginTopTotal = '-35px';
 
-                container.innerHTML += `
-                    <div class="card item-factura-row" data-search="${f.numero.toLowerCase()} ${f.vendedor.toLowerCase()} ${f.referencia.toLowerCase()}" style="cursor:pointer; border-left:5px solid ${borderColor}; ${bgColor}" onclick="verDetalleFactura('${key}')">
-                        <strong>${f.numero}</strong> | Cliente: ${f.cliente}<br>
-                        <small>Vendedor: ${f.vendedor} | Refs: ${f.referencia}</small>
-                        ${badgeComision}
-                        ${btnDespacharHtml}
-                        <div style="text-align:right; font-weight:bold; margin-top:${marginTopTotal};">
-                            $${f.totalUsd.toFixed(2)} <br><span style="font-size:12px; color:#666;">${totalBsDinamico.toFixed(2)} Bs</span>
+                // 🔥 Solo acumulamos el código HTML si estamos dentro del límite (50) o si urge mostrarlo (Pedido pendiente)
+                if (mostradas < limiteRender || esPendiente) {
+                    facturasHTML += `
+                        <div class="card item-factura-row" style="cursor:pointer; border-left:5px solid ${borderColor}; ${bgColor}" onclick="verDetalleFactura('${key}')">
+                            <strong>${f.numero}</strong> | Cliente: ${f.cliente}<br>
+                            <small>Vendedor: ${f.vendedor} | Refs: ${f.referencia}</small>
+                            ${badgeComision}
+                            ${btnDespacharHtml}
+                            <div style="text-align:right; font-weight:bold; margin-top:${marginTopTotal};">
+                                $${f.totalUsd.toFixed(2)} <br><span style="font-size:12px; color:#666;">${totalBsDinamico.toFixed(2)} Bs</span>
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                    mostradas++;
+                }
             }
+
+            // 🚀 INYECCIÓN MASIVA: Dibuja toda la pantalla de un solo golpe. 100x más rápido.
+            container.innerHTML = facturasHTML;
 
             if(document.getElementById('panel-comisiones')) {
                 if (configCache.comisionesActivas) {
@@ -1976,10 +2000,8 @@ window.calcularCambioEfectivo = function() {
         };
 
         window.filtrarFacturasHistorico = function() {
-            const val = document.getElementById('factura-buscador').value.toLowerCase();
-            document.querySelectorAll('.item-factura-row').forEach(row => {
-                row.style.display = row.getAttribute('data-search').includes(val) ? '' : 'none';
-            });
+            // Al escribir en el buscador, mandamos a cargar la lista filtrada de nuevo
+            renderizarFacturasHistorico();
         };
 
         window.verDetalleFactura = function(key) {
@@ -2467,13 +2489,34 @@ window.calcularCambioEfectivo = function() {
             const perfilData = { nombre, cedula, telefono, direccion, latitud, longitud };
             const cliData = { cedula, nombre, telefono, direccion, latitud, longitud };
 
+            // --- NUEVO: BLOQUEO DEL BOTÓN PARA EVITAR DOBLE CLIC ---
+            const btnGuardar = document.getElementById('btn-guardar-perfil');
+            const textoOriginal = "💾 Guardar Mis Datos";
+            if (btnGuardar) {
+                btnGuardar.innerText = "⏳ ESTAMOS PROCESANDO TU REGISTRO...";
+                btnGuardar.disabled = true;
+                btnGuardar.style.opacity = '0.7';
+                btnGuardar.style.cursor = 'wait';
+            }
+
+            // Función interna para restaurar el botón si ocurre un error
+            const restaurarBoton = () => {
+                if (btnGuardar) {
+                    btnGuardar.innerText = textoOriginal;
+                    btnGuardar.disabled = false;
+                    btnGuardar.style.opacity = '1';
+                    btnGuardar.style.cursor = 'pointer';
+                }
+            };
+
             // Si es un REGISTRO NUEVO
             if (!usuarioKeyActivo) {
-                if(!emailRegistro || !emailRegistro.includes("@")) return alert("Por favor, ingrese un correo electrónico válido.");
-                if(!password || password.length < 6) return alert("Debe crear una contraseña de mínimo 6 caracteres.");
+                if(!emailRegistro || !emailRegistro.includes("@")) { restaurarBoton(); return alert("Por favor, ingrese un correo electrónico válido."); }
+                if(!password || password.length < 6) { restaurarBoton(); return alert("Debe crear una contraseña de mínimo 6 caracteres."); }
 
                 if (clientesCache && clientesCache[cedula]) {
                     const telefonoEmpresa = configCache.contacto || "los números de atención";
+                    restaurarBoton();
                     return alert(`⚠️ ALERTA DE SEGURIDAD\n\nLa cédula ingresada ya está registrada.\nContacto: ${telefonoEmpresa}`);
                 }
 
@@ -2494,17 +2537,21 @@ window.calcularCambioEfectivo = function() {
                                 alert("✅ Registro Exitoso.\n\nBienvenido a la tienda. Hemos cargado tus datos, solo presiona 'Ingresar'.");
                                 
                                 // Volver al inicio de sesión de forma fluida
-                                document.querySelector('.navbar').style.display = 'flex';
-                                switchTab('tab-caja'); // Lo saca de la vista de perfil en el fondo
-                                document.getElementById('login-overlay').style.display = 'flex';
-                                
-                                // Prellenar correo y contraseña automáticamente
-                                document.getElementById('login-email').value = emailRegistro;
-                                document.getElementById('login-pass').value = password;
-                            });
-                        });
+                                signOut(auth).then(() => {
+                                    document.querySelector('.navbar').style.display = 'flex';
+                                    switchTab('tab-caja'); 
+                                    document.getElementById('login-overlay').style.display = 'flex';
+                                    
+                                    // Prellenar correo y contraseña automáticamente
+                                    document.getElementById('login-email').value = emailRegistro;
+                                    document.getElementById('login-pass').value = password;
+                                    restaurarBoton(); // Devolvemos el botón a la normalidad
+                                });
+                            }).catch(e => { restaurarBoton(); alert("Error al registrar cliente: " + e.message); });
+                        }).catch(e => { restaurarBoton(); alert("Error de permisos en Firebase al registrar perfil. Verifica las Reglas de Seguridad."); });
                     })
                     .catch((error) => {
+                        restaurarBoton();
                         if(error.code === 'auth/email-already-in-use') {
                             alert("Este correo electrónico ya se encuentra registrado. Inicie sesión.");
                         } else {
@@ -2516,9 +2563,16 @@ window.calcularCambioEfectivo = function() {
                 set(ref(db, `personal/${usuarioKeyActivo}/perfil`), perfilData).then(() => {
                     set(ref(db, `clientes/${cedula}`), cliData);
                     alert("✅ Tus datos se han actualizado correctamente.");
+                    
+                    cedulaActiva = cedula; 
+                    
                     document.getElementById('caja-cliente').value = nombre;
                     document.getElementById('caja-cliente').setAttribute('data-cedula', cedula);
+                    restaurarBoton();
                     switchTab('tab-caja'); 
+                }).catch(e => {
+                    restaurarBoton();
+                    alert("Error al actualizar: " + e.message);
                 });
             }
         };
